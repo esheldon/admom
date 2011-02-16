@@ -1,0 +1,2 @@
+Measure Adaptive Moments of objects in images.  Perform re-gaussianization
+of the PSF.  The code is Python+fortran.
