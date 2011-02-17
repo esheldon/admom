@@ -24,8 +24,8 @@ def admom(image, row, col,
           Irrguess=None, Ircguess=None, Iccguess=None,
           Tguess=None,
           shiftmax=5.0,
-          interp=True,
-          alt=False):
+          nsub=4,
+          old=False):
     """
     Name:
         admom
@@ -61,9 +61,11 @@ def admom(image, row, col,
 
         shiftmax: 
             Maximum allowed shift of the centroid in pixels.
-        interp: boolean
-            True to allow sub-pixel interpolation of the weights when
-            deemed appropriate. Default is True.
+        nsub:
+            If objects are not well resolved, sigma <= 2.3 pixels,
+            pixelization corrections will be applied by studying
+            nsubXnsub sub-pixel grids.  You can turn off sub-pixel
+            corrections by setting nsub=1
 
     Outputs:
         A dictionary containing
@@ -110,13 +112,14 @@ def admom(image, row, col,
         copy_guess(Irc, Ircguess)
         copy_guess(Icc, Iccguess)
             
-
-    if alt:
-        _admomf.ad_mom_alt(image,sky,sigsky,row,col,shiftmax,interp,
-                           Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,interpolated,whyflag)
-    else:
+    if old:
+        interp=True
         _admomf.ad_mom(image,sky,sigsky,row,col,shiftmax,interp,
                        Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,interpolated,whyflag)
+    else:
+        _admomf.ad_mom_sub(image,sky,sigsky,row,col,shiftmax,nsub,
+                            Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,interpolated,whyflag)
+
                      
     row -= 1
     col -= 1
