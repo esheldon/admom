@@ -23,6 +23,8 @@ c       2**8: detw <= 0
 c     calculates adaptive moments
 c     interpolates weights for poorly sampled objects
 
+      implicit none
+
       real tol1,tol2,xinterp2,xl,xh,yl,yh,xxx,yyy,xy,td,e1,e2,xinterp
       integer maxit
 
@@ -355,14 +357,16 @@ c            ay(kk)=ycen
 
 
       subroutine ad_mom_alt(data,nx,ny,sky,sigsky,ax,ay,nel,shiftmax,
-     &                      allowinterp,
-     &                      ixx,ixy,iyy,rho4,wcenx,wceny,uncer,
-     &                      numiter,interpolated,whyflag)
+     &allowinterp,
+     &ixx,ixy,iyy,rho4,wcenx,wceny,uncer,numiter,interpolated,whyflag)
 
 c     calculates adaptive moments
 c     interpolates weights for poorly sampled objects
 
-      real tol1,tol2,xinterp2,xl,xh,yl,yh,xxx,yyy,xy,td,e1,e2,xinterp
+      implicit none
+
+      real tol1,tol2,xinterp2,xl,xh,yl,yh
+      real xxx,xxx2,yyy,yyy2,xy,td,e1,e2,xinterp
       integer maxit
 
       logical allowinterp
@@ -383,6 +387,11 @@ c     interpolates weights for poorly sampled objects
       real ymod,tymod
       integer*2 interpolated(nel)
       logical interpflag
+
+      real wsum, w2sum, wwsumx, wwsumy
+      real wwsumxx, wwsumxy, wwsumyy, wwexpon2sum
+      real weight2
+  
 c     I changed tol1 from 0.01 to 0.001 to agree with the C code
 c     This xinterp converts to sigma as sqrt(xinterp).  3 was too small
 c     it turns out.  I got 5.3 from monte-carlos
@@ -434,7 +443,7 @@ c     loop over the neighborhood pixels
             call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**8
-            goto 8080
+            goto 9090
           endif
 
           if (allowinterp) then
@@ -467,31 +476,39 @@ c     loop over the neighborhood pixels
                 expon=max(expon,xh*xh*w2+yl*yl*w1-2.*xh*yl*w12)
                 if(expon.le.9.)then
 
-                  tymod = data(i,j)-sky(kk)
 
                   ! work over a 4x4 sub pixel grid
+                  wsum=0
+                  w2sum=0
+                  wwsumx=0
+                  wwsumy=0
+
                   xxx=xl
                   do ii=1,4
-                    xx2=xxx*xxx
+                    xxx2=xxx*xxx
                     yyy=yl
                     do jj=1,4
-                      yy2=yyy*yyy
+                      yyy2=yyy*yyy
 
-                      expon= xx2*w2 + yy2*w1 - 2.*xxx*yyy*w12
+
+                      expon= xxx2*w2 + yyy2*w1 - 2.*xxx*yyy*w12
                       weight=exp(-0.5*expon)
+                      weight2 = weight*weight
 
-                      ymod=tymod*weight/16.
-
-                      !sumx=sumx+ymod*float(i)
-                      !sumy=sumy+ymod*float(j)
-                      sumx=sumx+ymod*(xxx+xcen)
-                      sumy=sumy+ymod*(yyy+ycen)
-                      sum=sum+ymod
+                      wsum=wsum+weight
+                      w2sum = w2sum+weight2
+                      wwsumx=wwsumx + weight2*(xxx+xcen)
+                      wwsumy=wwsumy + weight2*(yyy+ycen)
 
                       yyy = yyy + 0.25
                     enddo ! loop y sub pixels
                     xxx = xxx + 0.25
                   enddo ! loop x sub pixels
+
+                  ymod = data(i,j)-sky(kk)
+                  sumx = sumx + ymod*wwsumx/wsum
+                  sumy = sumy + ymod*wwsumy/wsum
+                  sum = sum + ymod*w2sum/wsum
 
                 endif
               else
@@ -510,7 +527,7 @@ c     loop over the neighborhood pixels
             call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**0
-            goto 8080
+            goto 9090
           endif
           xcen=sumx/sum
           ycen=sumy/sum
@@ -519,7 +536,7 @@ c     loop over the neighborhood pixels
             call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**1
-            goto 8080
+            goto 9090
           endif
           
           sum=0.
@@ -540,31 +557,53 @@ c     loop over the neighborhood pixels
                 expon=max(expon,xh*xh*w2+yl*yl*w1-2.*xh*yl*w12)
                 if(expon.le.9.)then
 
-                  tymod = data(i,j)-sky(kk)
 
-                  ! work over a 4x4 sub pixel grid
+                  ! derive the correction factors from the subpixel
+                  ! grid
+                  wsum=0
+                  w2sum=0
+                  wwsumxx=0
+                  wwsumxy=0
+                  wwsumyy=0
+                  wwexpon2sum=0
+
                   xxx=xl
                   do ii=1,4
-                    xx2=xxx*xxx
+                    xxx2=xxx*xxx
                     yyy=yl
                     do jj=1,4
-                      yy2=yyy*yyy
+                      yyy2=yyy*yyy
 
-                      expon= xx2*w2 + yy2*w1 - 2.*xxx*yyy*w12
+                      expon= xxx2*w2 + yyy2*w1 - 2.*xxx*yyy*w12
                       weight=exp(-0.5*expon)
+                      weight2 = weight*weight
 
-                      ymod=tymod*weight/16.
-
-                      sumxx=sumxx+xx2*ymod
-                      sumyy=sumyy+yy2*ymod
-                      sumxy=sumxy+xxx*yyy*ymod
-                      sums4=sums4+expon*expon*ymod
-                      sum=sum+ymod
+                      wsum = wsum+weight
+                      w2sum = w2sum+weight2
+                      wwsumxx = wwsumxx + weight2*xxx2
+                      wwsumxy = wwsumxy + weight2*xxx*yyy
+                      wwsumyy = wwsumyy + weight2*yyy2
+                      wwexpon2sum = wwexpon2sum + weight2*expon*expon
 
                       yyy = yyy + 0.25
                     enddo ! loop y sub pixels
                     xxx = xxx + 0.25
                   enddo ! loop x sub pixels
+
+                  ymod = data(i,j)-sky(kk)
+                  sumxx = sumxx + ymod*wwsumxx/wsum
+                  sumxy = sumxy + ymod*wwsumxy/wsum
+                  sumyy = sumyy + ymod*wwsumyy/wsum
+                  sums4 = sums4 + ymod*wwexpon2sum/wsum
+                  sum = sum + ymod*w2sum/wsum
+                  !sum=sum+ymod*wsum/16.
+
+
+                  ! print comparison
+                  !xy=xx*yy
+                  !expon=xx2*w2+yy2*w1-2.*xy*w12
+                  !weight=exp(-expon)
+                  !print *,"(",xx,",",yy,") x2 fac:",(wwsumxx/wsum)
 
                 endif
               else
@@ -586,7 +625,7 @@ c     loop over the neighborhood pixels
             call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**2
-            goto 8080
+            goto 9090
           endif
           
           m(1,1)=sumxx/sum
@@ -596,7 +635,7 @@ c     loop over the neighborhood pixels
             call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**3
-            goto 8080
+            goto 9090
           endif
           td=w(1,1)+w(2,2)
           e1=(w(1,1)-w(2,2))/td
@@ -620,14 +659,14 @@ c            ay(kk)=ycen
             wcenx(kk)=xcen
             wceny(kk)=ycen
             numiter(kk)=imom
-            goto 8080
+            goto 9090
           else
             detm=(m(1,1)*m(2,2)-m(1,2)*m(1,2))
             if(detm.le.1.e-7)then
               call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
               numiter(kk)=imom
               whyflag(kk)=2**4
-              goto 8080
+              goto 9090
             endif
             
             detm=1./detm
@@ -641,7 +680,7 @@ c            ay(kk)=ycen
               call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
               numiter(kk)=imom
               whyflag(kk)=2**5
-              goto 8080
+              goto 9090
             endif
             
             detn=1./detn
@@ -656,7 +695,7 @@ c            ay(kk)=ycen
             call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**6
-            goto 8080
+            goto 9090
           endif
         enddo
         
@@ -664,10 +703,11 @@ c            ay(kk)=ycen
           call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
           numiter(kk)=imom
           whyflag(kk)=2**7
-          goto 8080
+          goto 9090
         endif
+        
 
- 8080 enddo
+ 9090 enddo
 
       return
 
