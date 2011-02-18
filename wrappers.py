@@ -23,6 +23,7 @@ def admom(image, row, col,
           sky=0.0, sigsky=1.0, 
           guess=None,
           shiftmax=5.0,
+          always=False,
           nsub=4):
     """
     Name:
@@ -102,8 +103,13 @@ def admom(image, row, col,
         Irr[:] = guess
         Icc[:] = guess
             
-    _admomf.ad_mom_sub(image,sky,sigsky,row,col,shiftmax,nsub,
-                       Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,interpolated,whyflag)
+    nsub=int(nsub)
+    if (nsub > 1) or always:
+        _admomf.ad_mom(image,sky,sigsky,row,col,shiftmax,nsub,
+                       Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,whyflag)
+    elif nsub == 1:
+        _admomf.ad_mom_nosub(image,sky,sigsky,row,col,shiftmax,
+                             Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,whyflag)
 
                      
     row -= 1
@@ -147,7 +153,7 @@ def admom(image, row, col,
          'numiter':numiter,
          'wrow':wrow,
          'wcol':wcol,
-         'interp':interpolated,
+         'nsub':nsub,
          'whyflag':whyflag,
          'whystr':whystr,
          'shiftmax':shiftmax,
@@ -158,7 +164,7 @@ def admom(image, row, col,
         out['guess'] = numpy.array(guess, ndmin=1, copy=False, dtype='f4')
     if is_scalar:
         for key in out:
-            if key != 'shiftmax':
+            if key not in ['shiftmax','nsub']:
                 out[key] = out[key][0]
     return out
 

@@ -12,3 +12,5 @@ from . import util
 from util import fwhm2sigma, sigma2fwhm
 from util import mom2fwhm, mom2sigma, fwhm2mom, sigma2mom
 from util import mom2ellip, ellip2mom
+
+import admom_test
