@@ -3,7 +3,6 @@ import sys
 from sys import stdout
 import numpy
 
-# the fortran version.  Should add c version too.
 from . import _admomf
 from . import util
 
@@ -16,26 +15,22 @@ flagmap={0:'ok',
          2**5: 'detn',
          2**6: 'w0',
          2**7: 'maxit',
-         2**8: 'detw0'}
+         2**8: 'detw0',
+         2**9: 'badnsub'}
 
 
 def admom(image, row, col, 
           sky=0.0, sigsky=1.0, 
-          Irrguess=None, Ircguess=None, Iccguess=None,
-          Tguess=None,
+          guess=None,
           shiftmax=5.0,
-          nsub=4,
-          old=False):
+          nsub=4):
     """
     Name:
         admom
     Purpose:
         Calculate adaptive moments on the input image.
     Calling Sequence:
-        res = admom(image, row, col, 
-                    Irrguess=None, Ircguess=None, Iccguess=None,
-                    Tguess=None,
-                    sky=0.0, sigsky=None, 
+        res = admom(image, row, col, sky=0.0, sigsky=None, guess=None,
                     shiftmax=5.0)
 
     Inputs:
@@ -52,12 +47,10 @@ def admom(image, row, col,
             The sigma of the sky in the image.  Can be a scalar or array of the
             same length as the row,col centers.  This is only used for error
             calculations.  Default is 1.0
-        Irrguess, Ircguess, Iccguess:
-            Guesses for the moments.  These should be same size as row,col or
-            scalar
-        Tguess: 
-            A guess for Irr+Icc.  This takes precedence over the individual
-            I**guess
+
+        guess: 
+            A guess for the second order moments, Ixx or Iyy.  The same
+            value is used as a guess for both.  This would be ~sigma**2
 
         shiftmax: 
             Maximum allowed shift of the centroid in pixels.
@@ -105,20 +98,12 @@ def admom(image, row, col,
     whyflag = numpy.zeros(row.size, dtype='i4')
     whystr = numpy.zeros(row.size, dtype='S5')
 
-    if Tguess is not None:
-        copy_Tguess(Irr, Icc, Tguess)
-    else:
-        copy_guess(Irr, Irrguess)
-        copy_guess(Irc, Ircguess)
-        copy_guess(Icc, Iccguess)
+    if guess is not None:
+        Irr[:] = guess
+        Icc[:] = guess
             
-    if old:
-        interp=True
-        _admomf.ad_mom(image,sky,sigsky,row,col,shiftmax,interp,
+    _admomf.ad_mom_sub(image,sky,sigsky,row,col,shiftmax,nsub,
                        Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,interpolated,whyflag)
-    else:
-        _admomf.ad_mom_sub(image,sky,sigsky,row,col,shiftmax,nsub,
-                            Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,interpolated,whyflag)
 
                      
     row -= 1
@@ -169,8 +154,8 @@ def admom(image, row, col,
          'sky':sky,
          'sigsky':sigsky}
 
-    if Tguess is not None:
-        out['Tguess'] = numpy.array(Tguess, ndmin=1, copy=False, dtype='f4')
+    if guess is not None:
+        out['guess'] = numpy.array(guess, ndmin=1, copy=False, dtype='f4')
     if is_scalar:
         for key in out:
             if key != 'shiftmax':
@@ -202,22 +187,6 @@ def get_sky_sigsky(n, sky, sigsky):
 
     return sky, sigsky
 
-def copy_Tguess(Irr, Icc, Tguess):
-    T = numpy.zeros(Irr.size, dtype='f4')
-    copy_guess(T, Tguess)
-    Irr[:] = T/2
-    Icc[:] = T/2
-def copy_guess(data, data_guess):
-    if data_guess is not None:
-        data_guess = numpy.array(data_guess,dtype='f4',copy=False,ndmin=1)
-        if data_guess.size == data.size:
-            data[:] = data_guess[:]
-        else:
-            if data_guess.size == 1:
-                data[:] = data_guess[0]
-            else:
-                raise ValueError("guess variables must be scalar or same "
-                                 "length as positions")
 
 def test(e=0.4, sigma=10.0, ntest=1000, doplot=False):
     """
@@ -306,19 +275,20 @@ def test(e=0.4, sigma=10.0, ntest=1000, doplot=False):
 
         tab.show()
 
-def test_admom_residuals(image, cen, Tguess, sky=0.0, sigsky=1.0):
+def test_admom_residuals(image, cen, guess, sky=0.0, sigsky=1.0):
     """
     Fit adaptive moments to the input image and display the residuals
     """
     import images
-    import imsim
+    import fimage
     import biggles
-    res = admom(image, cen[0], cen[1], Tguess=Tguess, sky=sky, sigsky=sigsky)
+    res = admom(image, cen[0], cen[1], guess=guess, sky=sky, sigsky=sigsky,
+                nsub=8)
 
     counts = image.sum()
     wcen=[res['wrow'],res['wcol']]
-    fake = imsim.mom2disk('gauss',res['Irr'],res['Irc'],res['Icc'],image.shape,
-                          counts=counts,cen=wcen)
+    fake = fimage.model_image('gauss',image.shape,wcen,res['Irr'],res['Irc'],res['Icc'],
+                              counts=counts)
 
     resid = fake-image
 
@@ -520,9 +490,9 @@ def test_errors(e=0.4, sigma=10.0, theta='random', ntest=1000, counts=5000, dopl
 
         
 
-def test1(Irr,Irc,Icc,counts=1, sigsky=None):
+def test1(Irr,Irc,Icc,counts=1, sigsky=None, nsub=4):
     import pprint
-    import imsim
+    import fimage
 
     T = Irr+Icc
     sigma = numpy.sqrt(T/2)
@@ -535,11 +505,11 @@ def test1(Irr,Irc,Icc,counts=1, sigsky=None):
     e1 = (Icc-Irr)/(Irr+Icc)
     e2 = 2*Irc/(Irr+Icc)
 
-    g = imsim.mom2disk('gauss', Irr, Irc, Icc, imdims, cen=cen, counts=counts)
+    g = fimage.model_image('gauss', imdims, cen, Irr, Irc, Icc, counts=counts, nsub=16)
 
     if sigsky is not None:
         g[:,:] += numpy.random.normal(size=g.size, scale=sigsky).reshape(g.shape)
-    res = admom(g, cen[0], cen[1], sigsky=sigsky, Tguess=T)
+    res = admom(g, cen[0], cen[1], sigsky=sigsky, guess=T/2, nsub=nsub)
 
     res['Irr_true'] = Irr
     res['Irc_true'] = Irc

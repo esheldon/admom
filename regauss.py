@@ -21,8 +21,9 @@ except:
 class ReGauss(dict):
     def __init__(self, image, row, col, psf, 
                  sigsky=1.0, 
-                 Tguess=None, 
-                 Tguess_psf=None,
+                 guess=None, 
+                 guess_psf=None,
+                 nsub=4,
                  conv='fft',
                  debug=False,
                  verbose=False):
@@ -36,6 +37,7 @@ class ReGauss(dict):
 
         self.verbose=verbose
         self.debug=debug
+        self.nsub=nsub
 
         if conv not in ['fft','real']:
             raise ValueError("conv should be one of: "+str(['fft','real']))
@@ -61,8 +63,8 @@ class ReGauss(dict):
         self.col=col
         self.psf = psf
 
-        self.Tguess=Tguess
-        self.Tguess_psf=Tguess_psf
+        self.guess=guess
+        self.guess_psf=guess_psf
 
         self.detf0_tol = 1.e-5
 
@@ -90,7 +92,8 @@ class ReGauss(dict):
                           self.col, 
                           sky=0.0,
                           sigsky=self.sigsky,
-                          Tguess=self.Tguess)
+                          guess=self.guess,
+                          nsub=self.nsub)
 
         self['imstats'] = out
 
@@ -102,7 +105,8 @@ class ReGauss(dict):
                           row, 
                           col, 
                           sky=0, 
-                          Tguess=self.Tguess_psf)
+                          guess=self.guess_psf,
+                          nsub=self.nsub)
 
         self['psfstats'] = out
 
@@ -145,7 +149,7 @@ class ReGauss(dict):
 
         self.iprime = self.image - self.f0conv
 
-        Tguess = self['imstats']['Irr'] + self['imstats']['Irr']
+        guess = (self['imstats']['Irr'] + self['imstats']['Irr'])/2
         wrow = self['imstats']['wrow']
         wcol = self['imstats']['wcol']
         out = admom.admom(self.iprime,
@@ -153,7 +157,8 @@ class ReGauss(dict):
                           wcol,
                           sky=0.0,
                           sigsky=self.sigsky,
-                          Tguess=Tguess)
+                          guess=guess,
+                          nsub=self.nsub)
 
         self['rgstats'] = out
 
@@ -357,7 +362,7 @@ def test_regauss(gal_ellip, gal_theta, psfinfo=None, show=True):
 
     gal = imsim.mom2disk('gauss', Irr, Irc, Icc, gal_imsize, cen=cen)
     
-    res = admom.admom(gal, cen[0], cen[1], Tguess=Tgal)
+    res = admom.admom(gal, cen[0], cen[1], guess=Tgal/2, nsub=4)
     print("gal_imsize:",gal_imsize)
 
     print("psf  e1: %f  e2: %f\n" % (psf_e1,psf_e2))
@@ -377,7 +382,7 @@ def test_regauss(gal_ellip, gal_theta, psfinfo=None, show=True):
         images.multiview(gal, levels=levels)
         images.multiview(imconv, levels=levels)
 
-    rg = ReGauss(imconv, cen[0], cen[1], psf, Tguess=Tgal, Tguess_psf=Tpsf)
+    rg = ReGauss(imconv, cen[0], cen[1], psf, guess=Tgal/2, guess_psf=Tpsf/2)
 
     rg.do_admom()
     print("admom stats")
