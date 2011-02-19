@@ -1,3 +1,14 @@
+'''
+Testing programs
+
+test_sub_pixel: test sub-pixel effects as a function of sub-pixel correction
+    factor resolution, nsub
+
+CovarVsInput: A class for measuring the covariance matrix and comparing to
+    input.
+run_covar_vs_input: shortcut function
+
+'''
 from __future__ import print_function
 
 import numpy
@@ -7,130 +18,218 @@ from .wrappers import admom
 import os
 import esutil as eu
 from esutil.ostools import path_join
+from esutil.numpy_util import where1
 
 from . import util
 
 import time
 
-def size_meas_vs_size_input(model):
-    """
-    
-    Test the measured Ixx+Iyy compared to the input Ixx+Iyy in the covariance
-    matrix.  
+def run_covar_vs_input(model):
+    cvi = CovarVsInput(model)
+    cvi.measure_covar()
 
-    """
+class CovarVsInput:
+    '''
+    Compare the input covariance matrix to measured using
+    adaptive moments for non-gaussian models.
+    '''
+    def __init__(self, model):
+        if model not in ['exp','dev']:
+            raise ValueError("models 'exp','dev'")
+        self.model = model
 
-    import fimage
-    import images
+        if model == 'exp':
+            self.sigfac = 7.0
+        else:
+            raise ValueError("Figure out dev sigfac")
 
-    if model not in ['exp','dev']:
-        raise ValueError("models 'exp','dev'")
-    if model == 'exp':
-        sigfac = 7.0
-    else:
-        raise ValueError("Figure out dev sigfac")
+    def sigma_vals(self):
+        return linspace(1.0, 20.0, 20)
+    def ellip_vals(self):
+        return linspace(0.0,0.7,7+1)
 
-    sigma_vals = linspace(1.0, 20.0, 20)
+    def struct(self, n):
+        data=zeros(n, dtype=[('sigma_index','i4'),
+                             ('ellip_index','i4'),
+                             ('Irr_input','f4'),
+                             ('Irc_input','f4'),
+                             ('Icc_input','f4'),
+                             ('Irr_meas','f4'),
+                             ('Irc_meas','f4'),
+                             ('Icc_meas','f4')])
+        return data
 
-    data=zeros(sigma_vals.size, dtype=[('sigma_input','f4'),
-                                       ('sigma_meas','f4')])
+    def dir(self):
+        dir=os.environ.get('REGAUSSIM_DIR',None)
+        if dir is None:
+            raise ValueError("REGAUSSIM_DIR must be set")
+        dir=path_join(dir,'admom-covar-meas-vs-input')
 
-    for i in xrange(sigma_vals.size):
-        sigma = sigma_vals[i]
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        return dir
 
-        dim = int( numpy.ceil(2.*sigfac*sigma ) )
-        if (dim % 2) == 0:
-            dim += 1
-        dims=[dim,dim]
-        cen=[(dim-1)/2]*2
-        print("sigma:",sigma,"dims:",dims)
+    def read(self):
+        return eu.io.read(self.file())
 
-        print("Creating image...")
-        im=fimage.model_image(model,dims,cen,[sigma**2,0.0,sigma**2],nsub=8)
+    def file(self):
+        dir=self.dir()
+        f='covar-meas-vs-input-%s.rec' % self.model
+        f=path_join(dir,f)
+        return f
 
-        print("Running admom...")
-        res = admom(im, cen[0], cen[1], guess=sigma, nsub=4)
-
-        data['sigma_input'][i] = sigma
-        data['sigma_meas'][i] = sqrt(res['Irr'])
-
-        implt = images.multiview(im, levels=7, show=False)
-        epsfile = sizemeas_sigma_image_file(model, sigma)
-        print("Writing image file:",epsfile)
-        implt.write_eps(epsfile)
-
-    f=sizemeas_file(model)
-    eu.io.write(f, data, verbose=True, clobber=True)
-
-'''
-def fitfunc(p,x):
-    return p[0] + p[1]*x
-def errfunc(p,x,y):
-    return fitfunc(p,x)-y
-'''
-
-def plot_size_meas_vs_size_input(model,show=False):
-    #from scipy import optimize
-
-    import biggles
-    from biggles import PlotLabel,FramedPlot,Table,Curve,PlotKey,Points
-    from pcolors import rainbow
-    import pprint
-
-    data = eu.io.read(sizemeas_file(model))
-
-    # Target function
-
-    fitfunc = lambda p, x: (p[0] + p[1]*x)
-    errfunc = lambda p, x, y: (fitfunc(p, x) - y) # Distance to the target function
-
-    x,y = data['sigma_input'].copy(),data['sigma_meas'].copy()
-
-    pars=numpy.polyfit(x,y,1)
-
-    plt=FramedPlot()
-
-    p = Points(x,y, type='filled circle')
-    plt.add(p)
-    plt.xlabel=r'$\sigma$ input'
-    plt.ylabel=r'$\sigma$ measured'
-
-    lab=PlotLabel(0.1,0.9,model)
-    plt.add(lab)
+    def epsfile(self, type):
+        dir=self.dir()
+        epsfile = '%s-%s.eps' % (type,self.model)
+        return path_join(dir,epsfile)
 
 
-    yfit=pars[0]*x + pars[1]
-    cfit=Curve(data['sigma_input'], yfit, color='red')
-    cfit.label = r'$%0.2f \sigma_{in} + %0.2f$' % tuple(pars)
-    plt.add( cfit )
-    key=PlotKey(0.95,0.07,[cfit], halign='right')
-    plt.add(key)
-    if show:
-        plt.show()
+    def measure_covar(self):
+        """
+        
+        Test the measured covariance matrix vs the input
 
-    epsfile=sizemeas_file(model, 'eps')
-    print("Writing eps file:",epsfile)
-    plt.write_eps(epsfile)
+        """
 
-def sizemeas_outdir():
-    dir=os.environ.get('REGAUSSIM_DIR',None)
-    if dir is None:
-        raise ValueError("REGAUSSIM_DIR must be set")
-    dir=path_join(dir,'admom-size-meas-vs-input')
-    return dir
+        import fimage
 
-def sizemeas_file(model, type='fits'):
-    dir=sizemeas_outdir()
-    f='size-meas-vs-input-%s' % model
-    f=path_join(dir,f+'.'+type)
-    return f
-def sizemeas_sigma_image_file(model, sigma):
-    dir=sizemeas_outdir()
-    f='size-meas-vs-input-%s-sigma%05.2f.eps' % (model,sigma)
-    f=path_join(dir,f)
-    return f
+        f=self.file()
+
+        sigma_vals = self.sigma_vals()
+        ellip_vals = self.ellip_vals()
+        data = self.struct(sigma_vals.size*ellip_vals.size)
+
+        ii=0
+        for i in xrange(sigma_vals.size):
+            sigma=sigma_vals[i]
+            for j in xrange(ellip_vals.size):
+                ellip = ellip_vals[j]
+
+                Irr,Irc,Icc = util.ellip2mom(2*sigma**2, e=ellip, theta=0.0)
+
+                dim = int( numpy.ceil(2.*self.sigfac*sigma ) )
+                if (dim % 2) == 0:
+                    dim += 1
+                dims=[dim,dim]
+                cen=[(dim-1)/2]*2
+                print("sigma:",sigma,"ellip:",ellip,"dims:",dims)
+
+                im=fimage.model_image(self.model,dims,cen,[Irr,Irc,Icc],nsub=8)
+                res = admom(im, cen[0], cen[1], guess=sigma, nsub=4)
+
+                data['sigma_index'][ii] = i
+                data['ellip_index'][ii] = j
+                data['Irr_input'][ii] = Irr
+                data['Irc_input'][ii] = Irc
+                data['Icc_input'][ii] = Icc
+                data['Irr_meas'][ii] = res['Irr']
+                data['Irc_meas'][ii] = res['Irc']
+                data['Icc_meas'][ii] = res['Icc']
+
+                ii+=1
+
+        hdr={'model':self.model}
+        eu.io.write(f, data, delim=' ', verbose=True, clobber=True, header=hdr)
+
+    def plot_ellip_vs_input(self, show=False):
+        '''
+        Plot the measured ellip as a function of the input for sigma_index=0
+        which is a reasonably large object
+        '''
+        import biggles
+        from biggles import PlotLabel,FramedPlot,Table,Curve,PlotKey,Points
+        from pcolors import rainbow
+        import pprint
+
+        data = self.read()
+        w=where1(data['sigma_index'] == 10)
+        data = data[w]
+        
+        e1_input, e2_input, Tinput = util.mom2ellip(data['Irr_input'],
+                                                    data['Irc_input'],
+                                                    data['Icc_input'])
+        e1_meas, e2_meas, Tinput = util.mom2ellip(data['Irr_meas'],
+                                                  data['Irc_meas'],
+                                                  data['Icc_meas'])
+
+        einput = sqrt(e1_input**2 + e2_input**2)
+        emeas = sqrt(e1_meas**2 + e2_meas**2)
+
+        plt=FramedPlot()
+
+        p = Points(einput,emeas, type='filled circle')
+        plt.add(p)
+        plt.xlabel=r'$\epsilon_{in}$'
+        plt.ylabel=r'$\epsilon_{meas}$'
+
+        sig=sqrt((data['Irr_meas'][0]+data['Icc_meas'][0])/2)
+        lab1=PlotLabel(0.1,0.9,self.model, halign='left')
+        lab2=PlotLabel(0.1,0.8,r'$\sigma: %0.2f$' % sig, halign='left')
+        plt.add(lab1,lab2)
 
 
+        einput.sort()
+        c = Curve(einput, einput, color='red')
+        c.label = r'$\epsilon_{input} = \epsilon_{meas}$'
+        key=PlotKey(0.95,0.07,[c], halign='right')
+        plt.add(c)
+        plt.add(key)
+        if show:
+            plt.show()
+
+        epsfile=self.epsfile('ellip-vs-input')
+        print("Writing eps file:",epsfile)
+        plt.write_eps(epsfile)
+
+
+
+    def plot_size_vs_input(self, show=False):
+        '''
+        Plot recovered size vs input for ellip=0, which is ellip_index=0
+        '''
+
+        import biggles
+        from biggles import PlotLabel,FramedPlot,Table,Curve,PlotKey,Points
+        from pcolors import rainbow
+        import pprint
+
+        data = self.read()
+        w=where1(data['ellip_index'] == 0)
+        data = data[w]
+
+        siginput = sqrt(data['Irr_input'])
+        sigmeas  = sqrt(data['Irr_meas'])
+
+
+        pars=numpy.polyfit(siginput, sigmeas, 1)
+        print("offset:",pars[1])
+        print("slope: ",pars[0])
+        print("IGNORING OFFSET")
+
+        plt=FramedPlot()
+
+        p = Points(siginput,sigmeas, type='filled circle')
+        plt.add(p)
+        plt.xlabel=r'$\sigma_{in}$'
+        plt.ylabel=r'$\sigma_{meas}$'
+
+        lab=PlotLabel(0.1,0.9,self.model)
+        plt.add(lab)
+
+        yfit2=pars[0]*siginput
+        cfit2=Curve(siginput, yfit2, color='steel blue')
+        cfit2.label = r'$%0.2f \sigma_{in}$' % pars[0]
+
+        plt.add( cfit2 )
+
+        key=PlotKey(0.95,0.07,[cfit2], halign='right')
+        plt.add(key)
+        if show:
+            plt.show()
+
+        epsfile=self.epsfile('size-vs-input')
+        print("Writing eps file:",epsfile)
+        plt.write_eps(epsfile)
 
 
 
