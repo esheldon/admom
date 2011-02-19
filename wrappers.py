@@ -56,10 +56,12 @@ def admom(image, row, col,
         shiftmax: 
             Maximum allowed shift of the centroid in pixels.
         nsub:
-            If objects are not well resolved, sigma <= 2.3 pixels,
-            pixelization corrections will be applied by studying
-            nsubXnsub sub-pixel grids.  You can turn off sub-pixel
-            corrections by setting nsub=1
+
+            Corrections for sub-pixel effects will be calculated on a nsubXnsub
+            grid on each pixel.  Default is 4x4.  The error for small objects
+            can especially be problematic for nsub < 4. nsub=4 will acheive
+            0.5% accuracy even for sigma=1 pixel objects.  For very large
+            objects you can get way with no corrections at all (nsub=1)
 
     Outputs:
         A dictionary containing

@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import numpy
-from numpy import linspace,array,zeros,sqrt,log10
+from numpy import linspace,array,zeros,sqrt,log10,sin
 from .wrappers import admom
 
 import os
@@ -12,27 +12,128 @@ from . import util
 
 import time
 
-def subpixel_outdir():
+def size_meas_vs_size_input(model):
+    """
+    
+    Test the measured Ixx+Iyy compared to the input Ixx+Iyy in the covariance
+    matrix.  
+
+    """
+
+    import fimage
+    import images
+
+    if model not in ['exp','dev']:
+        raise ValueError("models 'exp','dev'")
+    if model == 'exp':
+        sigfac = 7.0
+    else:
+        raise ValueError("Figure out dev sigfac")
+
+    sigma_vals = linspace(1.0, 20.0, 20)
+
+    data=zeros(sigma_vals.size, dtype=[('sigma_input','f4'),
+                                       ('sigma_meas','f4')])
+
+    for i in xrange(sigma_vals.size):
+        sigma = sigma_vals[i]
+
+        dim = int( numpy.ceil(2.*sigfac*sigma ) )
+        if (dim % 2) == 0:
+            dim += 1
+        dims=[dim,dim]
+        cen=[(dim-1)/2]*2
+        print("sigma:",sigma,"dims:",dims)
+
+        print("Creating image...")
+        im=fimage.model_image(model,dims,cen,[sigma**2,0.0,sigma**2],nsub=8)
+
+        print("Running admom...")
+        res = admom(im, cen[0], cen[1], guess=sigma, nsub=4)
+
+        data['sigma_input'][i] = sigma
+        data['sigma_meas'][i] = sqrt(res['Irr'])
+
+        implt = images.multiview(im, levels=7, show=False)
+        epsfile = sizemeas_sigma_image_file(model, sigma)
+        print("Writing image file:",epsfile)
+        implt.write_eps(epsfile)
+
+    f=sizemeas_file(model)
+    eu.io.write(f, data, verbose=True, clobber=True)
+
+'''
+def fitfunc(p,x):
+    return p[0] + p[1]*x
+def errfunc(p,x,y):
+    return fitfunc(p,x)-y
+'''
+
+def plot_size_meas_vs_size_input(model,show=False):
+    #from scipy import optimize
+
+    import biggles
+    from biggles import PlotLabel,FramedPlot,Table,Curve,PlotKey,Points
+    from pcolors import rainbow
+    import pprint
+
+    data = eu.io.read(sizemeas_file(model))
+
+    # Target function
+
+    fitfunc = lambda p, x: (p[0] + p[1]*x)
+    errfunc = lambda p, x, y: (fitfunc(p, x) - y) # Distance to the target function
+
+    x,y = data['sigma_input'].copy(),data['sigma_meas'].copy()
+
+    pars=numpy.polyfit(x,y,1)
+
+    plt=FramedPlot()
+
+    p = Points(x,y, type='filled circle')
+    plt.add(p)
+    plt.xlabel=r'$\sigma$ input'
+    plt.ylabel=r'$\sigma$ measured'
+
+    lab=PlotLabel(0.1,0.9,model)
+    plt.add(lab)
+
+
+    yfit=pars[0]*x + pars[1]
+    cfit=Curve(data['sigma_input'], yfit, color='red')
+    cfit.label = r'$%0.2f \sigma_{in} + %0.2f$' % tuple(pars)
+    plt.add( cfit )
+    key=PlotKey(0.95,0.07,[cfit], halign='right')
+    plt.add(key)
+    if show:
+        plt.show()
+
+    epsfile=sizemeas_file(model, 'eps')
+    print("Writing eps file:",epsfile)
+    plt.write_eps(epsfile)
+
+def sizemeas_outdir():
     dir=os.environ.get('REGAUSSIM_DIR',None)
     if dir is None:
         raise ValueError("REGAUSSIM_DIR must be set")
-    dir=path_join(dir,'admom-subpixel')
+    dir=path_join(dir,'admom-size-meas-vs-input')
     return dir
 
-def subpixel_file(ellip, theta, type='fits'):
-    dir=subpixel_outdir()
-    f='subpixel-accuracy-e%0.2f-theta%0.1f' % (ellip,theta)
+def sizemeas_file(model, type='fits'):
+    dir=sizemeas_outdir()
+    f='size-meas-vs-input-%s' % model
     f=path_join(dir,f+'.'+type)
     return f
+def sizemeas_sigma_image_file(model, sigma):
+    dir=sizemeas_outdir()
+    f='size-meas-vs-input-%s-sigma%05.2f.eps' % (model,sigma)
+    f=path_join(dir,f)
+    return f
 
-def subpixel_struct(nsigma, n_nsub):
-    dt=[('sigma','f4'),
-        ('nsub','f4',n_nsub),
-        ('Irr','f4',n_nsub),
-        ('Irc','f4',n_nsub),
-        ('Icc','f4',n_nsub),
-        ('a4','f4',n_nsub)]
-    return zeros(nsigma, dtype=dt)
+
+
+
+
 
 def test_sub_pixel_many():
     ellipvals = linspace(0.0,0.7,7+1)
@@ -166,4 +267,65 @@ def plot_sub_pixel(ellip,theta, show=False):
 
     print("Writing eps file:",epsfile)
     pltSigma.write_eps(epsfile)
+
+def subpixel_outdir():
+    dir=os.environ.get('REGAUSSIM_DIR',None)
+    if dir is None:
+        raise ValueError("REGAUSSIM_DIR must be set")
+    dir=path_join(dir,'admom-subpixel')
+    return dir
+
+def subpixel_file(ellip, theta, type='fits'):
+    dir=subpixel_outdir()
+    f='subpixel-accuracy-e%0.2f-theta%0.1f' % (ellip,theta)
+    f=path_join(dir,f+'.'+type)
+    return f
+
+def subpixel_struct(nsigma, n_nsub):
+    dt=[('sigma','f4'),
+        ('nsub','f4',n_nsub),
+        ('Irr','f4',n_nsub),
+        ('Irc','f4',n_nsub),
+        ('Icc','f4',n_nsub),
+        ('a4','f4',n_nsub)]
+    return zeros(nsigma, dtype=dt)
+
+
+def testfit():
+    import biggles 
+    from biggles import FramedPlot,Points,Curve
+    import scipy
+    from scipy.optimize import leastsq
+
+    ## Parametric function: 'v' is the parameter vector, 'x' the independent varible
+    fp = lambda v, x: v[0]/(x**v[1])*sin(v[2]*x)
+
+    ## Noisy function (used to generate data to fit)
+    v_real = [1.5, 0.1, 2.]
+    fn = lambda x: fp(v_real, x)
+
+    ## Error function
+    e = lambda v, x, y: (fp(v,x)-y)
+
+    ## Generating noisy data to fit
+    n = 30
+    xmin = 0.1
+    xmax = 5
+    x = linspace(xmin,xmax,n)
+    y = fn(x) + scipy.rand(len(x))*0.2*(fn(x).max()-fn(x).min())
+
+    ## Initial parameter value
+    v0 = [3., 1, 4.]
+
+    ## Fitting
+    v, success = leastsq(e, v0, args=(x,y), maxfev=10000)
+
+    print('Estimater parameters: ', v)
+    print('Real parameters: ', v_real)
+    X = linspace(xmin,xmax,n*5)
+    plt=FramedPlot()
+    plt.add(Points(x,y))
+    plt.add(Curve(X,fp(v,X),color='red'))
+
+    plt.show()
 
