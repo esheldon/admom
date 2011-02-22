@@ -189,7 +189,7 @@ class ReGauss(dict):
             wcol = self['imstats']['wcol']
             self.f0 = fimage.model_image('gauss',self.image.shape,[wrow,wcol],
                                          [Irr_f0, Irc_f0, Icc_f0],
-                                         counts=imcounts)
+                                         counts=imcounts,nsub=self.nsub)
             #self.f0 = imsim.mom2disk('gauss',
             #                         Irr_f0, Irc_f0, Icc_f0, self.image.shape, 
             #                         cen=[wrow,wcol], counts=imcounts)
@@ -224,6 +224,10 @@ class ReGauss(dict):
         
         # need both our gaussian and the psf to be normalized
         tpsf = self.psf/self.psf.sum()
+
+        if self.debug:
+            images.compare_images(tpsf, gauss, label1='psf',label2='gauss')
+            k=raw_input('hit a key: ')
 
         epsilon = tpsf - gauss
 
