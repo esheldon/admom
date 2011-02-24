@@ -38,6 +38,7 @@ class ReGauss(dict):
         self.verbose=verbose
         self.debug=debug
         self.nsub=nsub
+        print("  -> ReGauss nsub:",self.nsub)
 
         if conv not in ['fft','real']:
             raise ValueError("conv should be one of: "+str(['fft','real']))
@@ -149,6 +150,10 @@ class ReGauss(dict):
 
         self.iprime = self.image - self.f0conv
 
+        if self.debug:
+            images.compare_images(self.image, self.iprime, label1='original',label2='minus f0conv')
+            #k=raw_input('hit a key: ')
+
         guess = (self['imstats']['Irr'] + self['imstats']['Irr'])/2
         wrow = self['imstats']['wrow']
         wcol = self['imstats']['wcol']
@@ -193,6 +198,12 @@ class ReGauss(dict):
             #self.f0 = imsim.mom2disk('gauss',
             #                         Irr_f0, Irc_f0, Icc_f0, self.image.shape, 
             #                         cen=[wrow,wcol], counts=imcounts)
+
+            if self.debug:
+                plt=images.multiview(self.f0,show=False,levels=7)
+                plt.title='f0'
+                plt.show()
+                #k=raw_input('hit a key: ')
         else:
             print("Found det(f0) less than tolerance:",det_f0,"<",self.detf0_tol)
 
@@ -227,7 +238,7 @@ class ReGauss(dict):
 
         if self.debug:
             images.compare_images(tpsf, gauss, label1='psf',label2='gauss')
-            k=raw_input('hit a key: ')
+            #k=raw_input('hit a key: ')
 
         epsilon = tpsf - gauss
 
@@ -268,7 +279,23 @@ class ReGauss(dict):
         if (f0conv.shape[0] > self.image.shape[0] 
                 or f0conv.shape[1] > self.image.shape[1]):
             f0conv = f0conv[ 0:self.image.shape[0], 0:self.image.shape[1] ]
+            if self.debug:
+                print("trimming back")
+
         self.f0conv = f0conv
+
+        if self.debug:
+            print("f0.shape",self.f0.shape)
+            print("f0conv.shape",self.f0conv.shape)
+            plt=images.view(self.f0,show=False,levels=7)
+            plt.title='f0'
+            plt.show()
+            cplt=images.view(self.f0conv, show=False,levels=7)
+            cplt.title='f0conv'
+            cplt.show()
+            #images.compare_images(self.f0, self.f0conv, label1='f0',label2='f0conv')
+            #k=raw_input('hit a key: ')
+
 
     def do_rg_corr(self):
         self['rgcorrstats'] = None
