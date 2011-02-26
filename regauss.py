@@ -18,6 +18,8 @@ try:
 except:
     print("Could not import scipy.signal")
 
+from . import unweighted
+
 class ReGauss(dict):
     def __init__(self, image, row, col, psf, 
                  sigsky=1.0, 
@@ -75,7 +77,11 @@ class ReGauss(dict):
         self.do_basic_corr()
         self.do_regauss()
         self.do_rg_corr()
+        self.do_unweighted()
 
+    def do_unweighted(self):
+        res = unweighted.correct(self.image, self.psf)
+        self['uwstats'] = res
 
     def do_admom(self):
         '''

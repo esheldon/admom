@@ -30,6 +30,8 @@ def run_covar_vs_input(model):
 
 class CovarVsInput:
     '''
+    THERE IS ALSO ONE FOR unweighted moms
+
     Compare the input covariance matrix to measured using
     adaptive moments for non-gaussian models.
     '''
