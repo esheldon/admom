@@ -72,10 +72,17 @@ def admom(image, row, col,
     if len(image.shape) != 2:
         raise ValueError("image must be 2-dimensional")
 
+    dt = numpy.dtype(image.dtype)
+    if dt.name == 'float32':
+        dt='f4'
+    else:
+        # If image is not f8, will convert to f8 internally
+        dt='f8'
+
     is_scalar=numpy.isscalar(row)
 
-    row = numpy.array(row, ndmin=1, copy=True, dtype='f4')
-    col = numpy.array(col, ndmin=1, copy=True, dtype='f4')
+    row = numpy.array(row, ndmin=1, copy=True, dtype=dt)
+    col = numpy.array(col, ndmin=1, copy=True, dtype=dt)
     # add 1 for fortran index
     row += 1
     col += 1
@@ -85,16 +92,17 @@ def admom(image, row, col,
 
     sky,sigsky = get_sky_sigsky(row.size, sky, sigsky)
 
-    Irr = numpy.zeros(row.size, dtype='f4')
-    Irc = numpy.zeros(row.size, dtype='f4')
-    Icc = numpy.zeros(row.size, dtype='f4')
-    rho4 = numpy.zeros(row.size, dtype='f4')
-    uncer = numpy.zeros(row.size, dtype='f4')
+
+    Irr = numpy.zeros(row.size, dtype=dt)
+    Irc = numpy.zeros(row.size, dtype=dt)
+    Icc = numpy.zeros(row.size, dtype=dt)
+    rho4 = numpy.zeros(row.size, dtype=dt)
+    uncer = numpy.zeros(row.size, dtype=dt)
 
     numiter = numpy.zeros(row.size, dtype='i4')
 
-    wrow = numpy.zeros(row.size, dtype='f4') - 9999.
-    wcol = numpy.zeros(row.size, dtype='f4') - 9999.
+    wrow = numpy.zeros(row.size, dtype=dt) - 9999.
+    wcol = numpy.zeros(row.size, dtype=dt) - 9999.
 
     interpolated=numpy.zeros(row.size, dtype='i2')
 
@@ -106,12 +114,12 @@ def admom(image, row, col,
         Icc[:] = guess
             
     nsub=int(nsub)
-    if (nsub > 1) or always:
-        _admomf.ad_mom(image,sky,sigsky,row,col,shiftmax,nsub,
-                       Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,whyflag)
-    elif nsub == 1:
-        _admomf.ad_mom_nosub(image,sky,sigsky,row,col,shiftmax,
-                             Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,whyflag)
+    if dt == 'f4':
+        _admomf.ad_momf4(image,sky,sigsky,row,col,shiftmax,nsub,
+                         Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,whyflag)
+    else:
+        _admomf.ad_momf8(image,sky,sigsky,row,col,shiftmax,nsub,
+                         Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,whyflag)
 
                      
     row -= 1
@@ -121,10 +129,10 @@ def admom(image, row, col,
         wrow[w] -= 1
         wcol[w] -= 1
 
-    e1 = numpy.zeros(row.size, dtype='f4') + -9999.0
-    e2 = numpy.zeros(row.size, dtype='f4') + -9999.0
-    a4 = numpy.zeros(row.size, dtype='f4') + -9999.0
-    s2 = numpy.zeros(row.size, dtype='f4') + -9999.0
+    e1 = numpy.zeros(row.size, dtype=dt) + -9999.0
+    e2 = numpy.zeros(row.size, dtype=dt) + -9999.0
+    a4 = numpy.zeros(row.size, dtype=dt) + -9999.0
+    s2 = numpy.zeros(row.size, dtype=dt) + -9999.0
     w,=numpy.where(whyflag == 0)
     if w.size > 0:
         a4[w] = rho4[w]/2.0 - 1.0

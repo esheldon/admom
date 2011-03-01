@@ -18,7 +18,7 @@ c       2**8: detw <= 0
 c       2**9: nsub is not a postive integer
 
 
-      subroutine ad_mom(image,nx,ny,sky,sigsky,ax,ay,nel,shiftmax,
+      subroutine ad_momf4(image,nx,ny,sky,sigsky,ax,ay,nel,shiftmax,
      &nsub,
      &ixx,ixy,iyy,rho4,wcenx,wceny,uncer,numiter,whyflag)
 
@@ -29,16 +29,16 @@ c     applies pixelization corrections
 
       
       integer nel,nx,ny
-      real image(nx,ny)
-      real ax(nel),ay(nel)
-      real ixx(nel),iyy(nel),ixy(nel)
-      real sky(nel),uncer(nel),sigsky(nel),rho4(nel)
-      real shiftmax
-      real wcenx(nel),wceny(nel)
+      real*4 image(nx,ny)
+      real*4 ax(nel),ay(nel)
+      real*4 ixx(nel),iyy(nel),ixy(nel)
+      real*4 sky(nel),uncer(nel),sigsky(nel),rho4(nel)
+      real*4 shiftmax
+      real*4 wcenx(nel),wceny(nel)
       integer numiter(nel),whyflag(nel)
 
-      real x,y,xl,yl,xx,xx2,yy,yy2,td,e1,e2
-      real tol1,tol2
+      real*4 x,y,xl,yl,xx,xx2,yy,yy2,td,e1,e2
+      real*4 tol1,tol2
       integer maxit
 
       integer*4 nsub
@@ -46,20 +46,20 @@ c     applies pixelization corrections
 
       integer imom
       integer ix1,ix2,iy1,iy2,i,j,ii,jj
-      real w(2,2),m(2,2),n(2,2)
-      real xcen,ycen
-      real sumx,sumy,grad,expon,weight,detm,detw,detn,sums4
-      real spi,sumxx,sumyy,sumxy,sum,w1,w2,w12
+      real*4 w(2,2),m(2,2),n(2,2)
+      real*4 xcen,ycen
+      real*4 sumx,sumy,grad,expon,weight,detm,detw,detn,sums4
+      real*4 spi,sumxx,sumyy,sumxy,sum,w1,w2,w12
 
       integer kk
-      real e1old,e2old,m11old
-      real xcenorig,ycenorig
+      real*4 e1old,e2old,m11old
+      real*4 xcenorig,ycenorig
 
-      real ymod
+      real*4 ymod
 
-      real wsum, w2sum, wwsumx, wwsumy
-      real wwsumxx, wwsumxy, wwsumyy, wwexpon2sum
-      real weight2
+      real*4 wsum, w2sum, wwsumx, wwsumy
+      real*4 wwsumxx, wwsumxy, wwsumyy, wwexpon2sum
+      real*4 weight2
   
 c     I changed tol1 from 0.01 to 0.001 to agree with the C code
       parameter(tol1=0.001,tol2=0.01,maxit=100)
@@ -67,7 +67,7 @@ c     I changed tol1 from 0.01 to 0.001 to agree with the C code
 
       if (nsub <= 0) then
         do kk=1,nel
-          call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+          call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
           whyflag(kk)=2**9
         enddo
         return
@@ -117,7 +117,7 @@ c         4-sigma region around object, but within image
           detw=w(1,1)*w(2,2)-w(1,2)*w(1,2)
 
           if(detw.le.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**8
             goto 8080
@@ -151,17 +151,16 @@ c         4-sigma region around object, but within image
 
                   expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
                   ! the fortran I'm using is actually ok with very
-                  ! large exponents, but just to be safe...
-                  if (expon .le. 100) then
-                    weight=exp(-0.5*expon)
-                    weight2 = weight*weight
+                  ! large exponents
 
-                    wsum=wsum+weight
-                    w2sum = w2sum+weight2
-                    wwsumx=wwsumx + weight2*(xx+xcen)
-                    wwsumy=wwsumy + weight2*(yy+ycen)
+                  weight=exp(-0.5*expon)
+                  weight2 = weight*weight
 
-                  endif
+                  wsum=wsum+weight
+                  w2sum = w2sum+weight2
+                  wwsumx=wwsumx + weight2*(xx+xcen)
+                  wwsumy=wwsumy + weight2*(yy+ycen)
+
 
                   yy = yy + stepsize
                 enddo ! loop y sub pixels
@@ -179,7 +178,7 @@ c         4-sigma region around object, but within image
           enddo
 
           if(sum.le.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**0
             goto 8080
@@ -190,7 +189,7 @@ c         4-sigma region around object, but within image
 
           if(abs(xcen-xcenorig).gt.shiftmax.or.
      &    abs(ycen-ycenorig).gt.shiftmax)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**1
             goto 8080
@@ -225,19 +224,16 @@ c         4-sigma region around object, but within image
                   expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
 
                   ! the fortran I'm using is actually ok with very
-                  ! large exponents, but just to be safe...
-                  if (expon .le. 100) then
-                    weight=exp(-0.5*expon)
-                    weight2 = weight*weight
+                  ! large exponents
+                  weight=exp(-0.5*expon)
+                  weight2 = weight*weight
 
-                    wsum = wsum+weight
-                    w2sum = w2sum+weight2
-                    wwsumxx = wwsumxx + weight2*xx2
-                    wwsumxy = wwsumxy + weight2*xx*yy
-                    wwsumyy = wwsumyy + weight2*yy2
-                    wwexpon2sum = wwexpon2sum + weight2*expon*expon
-
-                  endif
+                  wsum = wsum+weight
+                  w2sum = w2sum+weight2
+                  wwsumxx = wwsumxx + weight2*xx2
+                  wwsumxy = wwsumxy + weight2*xx*yy
+                  wwsumyy = wwsumyy + weight2*yy2
+                  wwexpon2sum = wwexpon2sum + weight2*expon*expon
 
                   yy = yy + stepsize
                 enddo ! loop y sub pixels
@@ -257,7 +253,7 @@ c         4-sigma region around object, but within image
           enddo
 
           if(sum.le.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**2
             goto 8080
@@ -267,7 +263,7 @@ c         4-sigma region around object, but within image
           m(2,2)=sumyy/sum
           m(1,2)=sumxy/sum
           if(m(1,1).le.0..and.m(2,2).le.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**3
             goto 8080
@@ -303,7 +299,7 @@ c         4-sigma region around object, but within image
 
             detm=(m(1,1)*m(2,2)-m(1,2)*m(1,2))
             if(detm.le.1.e-7)then
-              call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+              call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
               numiter(kk)=imom
               whyflag(kk)=2**4
               goto 8080
@@ -320,7 +316,7 @@ c         4-sigma region around object, but within image
             detn=n(1,1)*n(2,2)-n(1,2)*n(1,2)
             
             if(detn.le.0.)then
-              call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+              call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
               numiter(kk)=imom
               whyflag(kk)=2**5
               goto 8080
@@ -337,7 +333,7 @@ c         4-sigma region around object, but within image
           endif
 
           if(w(1,1).lt.0..or.w(2,2).lt.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**6
             goto 8080
@@ -346,7 +342,7 @@ c         4-sigma region around object, but within image
         enddo
         
         if(imom.eq.maxit)then
-          call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+          call setbad_f4(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
           numiter(kk)=imom
           whyflag(kk)=2**7
           goto 8080
@@ -362,9 +358,9 @@ c         4-sigma region around object, but within image
 
 
 
-      subroutine setbad(ixx,iyy,ixy,rho4,uncer)
+      subroutine setbad_f4(ixx,iyy,ixy,rho4,uncer)
       
-      real ixx,iyy,ixy,rho4,uncer
+      real*4 ixx,iyy,ixy,rho4,uncer
 
       ixx=-9999.0
       iyy=-9999.0
@@ -380,46 +376,70 @@ c         4-sigma region around object, but within image
 
 
 
-      subroutine ad_mom_nosub(image,nx,ny,sky,sigsky,ax,ay,nel,shiftmax,
+      subroutine ad_momf8(image,nx,ny,sky,sigsky,ax,ay,nel,shiftmax,
+     &nsub,
      &ixx,ixy,iyy,rho4,wcenx,wceny,uncer,numiter,whyflag)
 
+c     calculates adaptive moments
+c     applies pixelization corrections
 
       implicit none
 
-      real tol1,tol2
-      real td,e1,e2
-      integer maxit
       
       integer nel,nx,ny
-      real image(nx,ny)
-      real ax(nel),ay(nel)
-      real ixx(nel),iyy(nel),ixy(nel)
-      real sky(nel),uncer(nel),sigsky(nel),shiftmax,rho4(nel)
-      real wcenx(nel),wceny(nel)
+      real*8 image(nx,ny)
+      real*8 ax(nel),ay(nel)
+      real*8 ixx(nel),iyy(nel),ixy(nel)
+      real*8 sky(nel),uncer(nel),sigsky(nel),rho4(nel)
+      real*8 shiftmax
+      real*8 wcenx(nel),wceny(nel)
       integer numiter(nel),whyflag(nel)
 
+      real*8 x,y,xl,yl,xx,xx2,yy,yy2,td,e1,e2
+      real*8 tol1,tol2
+      integer maxit
+
+      integer*4 nsub
+      real*8 stepsize, offset
+
       integer imom
-      integer ix1,ix2,iy1,iy2,i,j
-      real w(2,2),m(2,2),n(2,2)
-      real xcen,ycen
-      real sumx,sumy,grad,expon,weight,detm,detw,detn,sums4
-      real spi,sumxx,sumyy,sumxy,sum,w1,w2,w12,x,x2,y,y2,xy
+      integer ix1,ix2,iy1,iy2,i,j,ii,jj
+      real*8 w(2,2),m(2,2),n(2,2)
+      real*8 xcen,ycen
+      real*8 sumx,sumy,grad,expon,weight,detm,detw,detn,sums4
+      real*8 spi,sumxx,sumyy,sumxy,sum,w1,w2,w12
 
       integer kk
+      real*8 e1old,e2old,m11old
+      real*8 xcenorig,ycenorig
 
-      real e1old,e2old,m11old
-      real xcenorig,ycenorig
-      real ymod
+      real*8 ymod
 
+      real*8 wsum, w2sum, wwsumx, wwsumy
+      real*8 wwsumxx, wwsumxy, wwsumyy, wwexpon2sum
+      real*8 weight2
   
 c     I changed tol1 from 0.01 to 0.001 to agree with the C code
       parameter(tol1=0.001,tol2=0.01,maxit=100)
       
 
+      if (nsub <= 0) then
+        do kk=1,nel
+          call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+          whyflag(kk)=2**9
+        enddo
+        return
+      endif
+
+c     for sub-pixel corrections
+      stepsize = 1./nsub
+      offset = (nsub-1)*stepsize/2.
+
 c     The main do loop now
 
       spi=sqrt(atan(1.)*4.)
       do kk=1,nel
+
         w(1,1)=max(1.,ixx(kk))
         w(2,2)=max(1.,iyy(kk))
         w(1,2)=ixy(kk)
@@ -427,9 +447,9 @@ c     The main do loop now
         e1old=10.
         e2old=10.
         m11old=1.e6
-
         xcen=ax(kk)
         ycen=ay(kk)
+
         xcenorig=xcen
         ycenorig=ycen
         
@@ -437,7 +457,7 @@ c     The main do loop now
         do while(imom.lt.maxit)
           imom=imom+1
 
-          ! 4-sigma region
+c         4-sigma region around object, but within image
           grad=4.*sqrt(max(w(1,1),w(2,2)))
           ix1=nint(max(xcen-grad-0.5,1.))
           iy1=nint(max(ycen-grad-0.5,1.))
@@ -453,100 +473,170 @@ c     The main do loop now
           sums4=0.
 
           detw=w(1,1)*w(2,2)-w(1,2)*w(1,2)
+
           if(detw.le.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**8
-            goto 6060
+            goto 9090
           endif
-
 
           w1=w(1,1)/detw
           w2=w(2,2)/detw
           w12=w(1,2)/detw
 
+          ! first get the weighted centroid
           do i=ix1,ix2
             x=i-xcen
+            xl=x-offset
             do j=iy1,iy2
               y=j-ycen
+              yl=y-offset
 
-              expon=x*x*w2 + y*y*w1 -2.*x*y*w12
+              ! work over a 4x4 sub pixel grid
+              ! to compute pixel corrections
+              wsum=0
+              w2sum=0
+              wwsumx=0
+              wwsumy=0
 
-              if(expon.le.100.)then
+              xx=xl
+              do ii=1,nsub
+                xx2=xx*xx
+                yy=yl
+                do jj=1,nsub
+                  yy2=yy*yy
 
-                weight=exp(-0.5*expon)
-                ymod=(image(i,j)-sky(kk))*weight
-                sumx=sumx+ymod*float(i)
-                sumy=sumy+ymod*float(j)
-                sum=sum+ymod
+                  expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
 
+                  ! the fortran I'm using is actually ok with very
+                  ! large exponents
+                  weight=exp(-0.5*expon)
+                  weight2 = weight*weight
+
+                  wsum=wsum+weight
+                  w2sum = w2sum+weight2
+                  wwsumx=wwsumx + weight2*(xx+xcen)
+                  wwsumy=wwsumy + weight2*(yy+ycen)
+
+
+                  yy = yy + stepsize
+                enddo ! loop y sub pixels
+                xx = xx + stepsize
+              enddo ! loop x sub pixels
+
+              if (wsum .gt. 0) then
+                ymod = image(i,j)-sky(kk)
+                sumx = sumx + ymod*wwsumx/wsum
+                sumy = sumy + ymod*wwsumy/wsum
+                sum = sum + ymod*w2sum/wsum
               endif
-            enddo
 
+            enddo
           enddo
+
           if(sum.le.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**0
-            goto 6060
+            goto 9090
           endif
+
           xcen=sumx/sum
           ycen=sumy/sum
+
           if(abs(xcen-xcenorig).gt.shiftmax.or.
      &    abs(ycen-ycenorig).gt.shiftmax)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**1
-            goto 6060
+            goto 9090
           endif
           
+          ! now with the new centroid, measure the weighted moments
+          ! with sub-pixel corrections
           sum=0.
           do i=ix1,ix2
             x=i-xcen
-            x2=x*x
+            xl=x-offset
             do j=iy1,iy2
               y=j-ycen
-              y2=y*y
+              yl=y-offset
 
-              xy=x*y
-              expon=x2*w2+y2*w1-2.*xy*w12
+              ! derive the correction factors from the subpixel
+              ! grid
+              wsum=0
+              w2sum=0
+              wwsumxx=0
+              wwsumxy=0
+              wwsumyy=0
+              wwexpon2sum=0
 
-              if(expon.le.100.)then
+              xx=xl
+              do ii=1,nsub
+                xx2=xx*xx
+                yy=yl
+                do jj=1,nsub
+                  yy2=yy*yy
 
-                weight=exp(-0.5*expon)
-                ymod=(image(i,j)-sky(kk))*weight
-                sumxx=sumxx+x2*ymod
-                sumyy=sumyy+y2*ymod
-                sumxy=sumxy+xy*ymod
-                sums4=sums4+expon*expon*ymod
-                sum=sum+ymod
+                  expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
 
+                  ! the fortran I'm using is actually ok with very
+                  ! large exponents
+                  weight=exp(-0.5*expon)
+                  weight2 = weight*weight
+
+                  wsum = wsum+weight
+                  w2sum = w2sum+weight2
+                  wwsumxx = wwsumxx + weight2*xx2
+                  wwsumxy = wwsumxy + weight2*xx*yy
+                  wwsumyy = wwsumyy + weight2*yy2
+                  wwexpon2sum = wwexpon2sum + weight2*expon*expon
+
+                  yy = yy + stepsize
+                enddo ! loop y sub pixels
+                xx = xx + stepsize
+              enddo ! loop x sub pixels
+
+              if (wsum .gt. 0) then
+                ymod = image(i,j)-sky(kk)
+                sumxx = sumxx + ymod*wwsumxx/wsum
+                sumxy = sumxy + ymod*wwsumxy/wsum
+                sumyy = sumyy + ymod*wwsumyy/wsum
+                sums4 = sums4 + ymod*wwexpon2sum/wsum
+                sum = sum + ymod*w2sum/wsum
               endif
-            enddo
 
+            enddo
           enddo
+
           if(sum.le.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**2
-            goto 6060
+            goto 9090
           endif
           
           m(1,1)=sumxx/sum
           m(2,2)=sumyy/sum
           m(1,2)=sumxy/sum
           if(m(1,1).le.0..and.m(2,2).le.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**3
-            goto 6060
+            goto 9090
           endif
+
           td=w(1,1)+w(2,2)
           e1=(w(1,1)-w(2,2))/td
           e2=2.*w(1,2)/td
+
+          !print *,imom,sum,td,e1,e2
+
           if(abs(e1-e1old).lt.tol1.and.abs(e2-e2old).lt.tol1.and.
      &    abs(m(1,1)/m11old-1.).le.tol2)then
 
+            ! convergence criteria met
             ixx(kk)=w(1,1)
             iyy(kk)=w(2,2)
             ixy(kk)=w(1,2)
@@ -561,15 +651,16 @@ c     The main do loop now
             wcenx(kk)=xcen
             wceny(kk)=ycen
             numiter(kk)=imom
-            goto 6060
+            goto 9090
 
           else
+
             detm=(m(1,1)*m(2,2)-m(1,2)*m(1,2))
             if(detm.le.1.e-7)then
-              call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+              call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
               numiter(kk)=imom
               whyflag(kk)=2**4
-              goto 6060
+              goto 9090
             endif
             
             ! no convergence, set a new weight function from the
@@ -583,10 +674,10 @@ c     The main do loop now
             detn=n(1,1)*n(2,2)-n(1,2)*n(1,2)
             
             if(detn.le.0.)then
-              call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+              call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
               numiter(kk)=imom
               whyflag(kk)=2**5
-              goto 6060
+              goto 9090
             endif
             
             detn=1./detn
@@ -596,28 +687,51 @@ c     The main do loop now
             e1old=e1
             e2old=e2
             m11old=m(1,1)
+
           endif
+
           if(w(1,1).lt.0..or.w(2,2).lt.0.)then
-            call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
             numiter(kk)=imom
             whyflag(kk)=2**6
-            goto 6060
+            goto 9090
           endif
+
         enddo
         
         if(imom.eq.maxit)then
-          call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+          call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
           numiter(kk)=imom
           whyflag(kk)=2**7
-          goto 6060
+          goto 9090
         endif
         
- 6060 continue
+ 9090 continue
       enddo
 
       return
 
       end
+
+
+
+
+      subroutine setbad_f8(ixx,iyy,ixy,rho4,uncer)
+      
+      real*8 ixx,iyy,ixy,rho4,uncer
+
+      ixx=-9999.0
+      iyy=-9999.0
+      ixy=-9999.0
+      rho4=-9999.0
+      uncer=9999.0
+
+      return
+
+      end
+
+
+
 
 
 

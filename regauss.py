@@ -19,16 +19,10 @@ except:
     print("Could not import scipy.signal")
 
 from . import unweighted
+from pprint import pprint
 
 class ReGauss(dict):
-    def __init__(self, image, row, col, psf, 
-                 sigsky=1.0, 
-                 guess=None, 
-                 guess_psf=None,
-                 nsub=4,
-                 conv='fft',
-                 debug=False,
-                 verbose=False):
+    def __init__(self, image, row, col, psf, **keys):
         '''
         The psf must have odd dimention in pixels, e.g. [31,31] and the center must
         be at [(nrow-1)/2, (ncol-1)/2]
@@ -37,39 +31,46 @@ class ReGauss(dict):
         The psf sky value must be zero.
         '''
 
-        self.verbose=verbose
-        self.debug=debug
-        self.nsub=nsub
-        print("  -> ReGauss nsub:",self.nsub)
-
-        if conv not in ['fft','real']:
-            raise ValueError("conv should be one of: "+str(['fft','real']))
-        self.conv=conv
-
-        if len(image.shape) != 2:
-            raise ValueError("image must be 2-d")
-        if len(psf.shape) != 2:
-            raise ValueError("psf must be a 2-d image")
-
-        if (psf.shape[0] % 2) != 1 or (psf.shape[1] % 2) != 1:
-            raise ValueError("psf must have odd number of pixels in each "
-                             "dimension for FFT convolution")
-
-
-        if (not numpy.isscalar(row) or not numpy.isscalar(col)
-                or not numpy.isscalar(sigsky)):
-            raise ValueError("regauss requires scalar row,col,sigsky")
-
         self.image = image
-        self.sigsky=sigsky
         self.row=row
         self.col=col
         self.psf = psf
 
-        self.guess=guess
-        self.guess_psf=guess_psf
+        self.conv = keys.get('conv','fft')
+        self.image_nsub=keys.get('image_nsub',16)
+        self.admom_nsub=keys.get('admom_nsub',4)
+        self.sigsky = keys.get('sigsky', 1.0)
+        self.guess=keys.get('guess', None)
+        self.guess_psf=keys.get('guess_psf',None)
+    
+        self.detf0_tol = keys.get('detf0_tol',1.e-5)
 
-        self.detf0_tol = 1.e-5
+        self.verbose=keys.get('verbose',False)
+        self.debug=keys.get('debug',False)
+
+        print("  -> ReGauss admom nsub:",self.admom_nsub)
+        print("  -> ReGauss image nsub:",self.image_nsub)
+
+        self.check_init()
+
+    def check_init(self):
+        if self.conv not in ['fft','real']:
+            raise ValueError("conv should be one of: "+str(['fft','real']))
+
+        if len(self.image.shape) != 2:
+            raise ValueError("image must be 2-d")
+        if len(self.psf.shape) != 2:
+            raise ValueError("psf must be a 2-d image")
+
+        if (self.psf.shape[0] % 2) != 1 or (self.psf.shape[1] % 2) != 1:
+            raise ValueError("psf must have odd number of pixels in each "
+                             "dimension for FFT convolution")
+
+        if (not numpy.isscalar(self.row) or not numpy.isscalar(self.col)
+                or not numpy.isscalar(self.sigsky)):
+            raise ValueError("regauss requires scalar row,col,sigsky")
+
+
 
     def do_all(self):
         self.do_admom()
@@ -81,7 +82,7 @@ class ReGauss(dict):
 
     def do_unweighted(self):
         res = unweighted.correct(self.image, self.psf)
-        self['uwstats'] = res
+        self['uwcorrstats'] = res
 
     def do_admom(self):
         '''
@@ -100,9 +101,13 @@ class ReGauss(dict):
                           sky=0.0,
                           sigsky=self.sigsky,
                           guess=self.guess,
-                          nsub=self.nsub)
+                          nsub=self.admom_nsub)
 
         self['imstats'] = out
+        if self.verbose:
+            print("image stats:")
+            pprint(out)
+
 
     def do_psf_admom(self):
         row = (self.psf.shape[0]-1)/2
@@ -113,9 +118,12 @@ class ReGauss(dict):
                           col, 
                           sky=0, 
                           guess=self.guess_psf,
-                          nsub=self.nsub)
+                          nsub=self.admom_nsub)
 
         self['psfstats'] = out
+        if self.verbose:
+            print("psf stats:")
+            pprint(out)
 
     def do_basic_corr(self):
         if 'imstats' not in self or 'psfstats' not in self:
@@ -134,6 +142,9 @@ class ReGauss(dict):
                                       psfs['e1'],psfs['e2'],psfs['a4'])
 
         self['corrstats'] = {'e1':e1,'e2':e2,'R':R,'flags':flags}
+        if self.verbose:
+            print("corrstats:")
+            pprint(self['corrstats'])
 
 
     def do_regauss(self):
@@ -169,10 +180,13 @@ class ReGauss(dict):
                           sky=0.0,
                           sigsky=self.sigsky,
                           guess=guess,
-                          nsub=self.nsub)
+                          nsub=self.admom_nsub)
 
         self['rgstats'] = out
 
+        if self.verbose:
+            print("rgstats:")
+            pprint(self['rgstats'])
    
     def make_f0(self):
         if 'imstats' not in self or 'psfstats' not in self:
@@ -200,7 +214,7 @@ class ReGauss(dict):
             wcol = self['imstats']['wcol']
             self.f0 = fimage.model_image('gauss',self.image.shape,[wrow,wcol],
                                          [Irr_f0, Irc_f0, Icc_f0],
-                                         counts=imcounts,nsub=self.nsub)
+                                         counts=imcounts,nsub=self.image_nsub)
             #self.f0 = imsim.mom2disk('gauss',
             #                         Irr_f0, Irc_f0, Icc_f0, self.image.shape, 
             #                         cen=[wrow,wcol], counts=imcounts)
@@ -329,6 +343,9 @@ class ReGauss(dict):
                                       psfs['e1'],psfs['e2'],0.0)
 
         self['rgcorrstats'] = {'e1':e1,'e2':e2,'R':R,'flags':flags}
+        if self.verbose:
+            print("rgcorrstats:")
+            pprint(self['rgcorrstats'])
 
 
 

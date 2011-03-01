@@ -24,11 +24,11 @@ from . import util
 
 import time
 
-def run_covar_vs_input(model):
-    cvi = CovarVsInput(model)
-    cvi.measure_covar()
+def run_cov_vs_input(model):
+    cvi = CovVsInput(model)
+    cvi.measure_cov()
 
-class CovarVsInput:
+class CovVsInput:
     '''
     THERE IS ALSO ONE FOR unweighted moms
 
@@ -53,12 +53,12 @@ class CovarVsInput:
     def struct(self, n):
         data=zeros(n, dtype=[('sigma_index','i4'),
                              ('ellip_index','i4'),
-                             ('Irr_input','f4'),
-                             ('Irc_input','f4'),
-                             ('Icc_input','f4'),
-                             ('Irr_meas','f4'),
-                             ('Irc_meas','f4'),
-                             ('Icc_meas','f4')])
+                             ('Irr_input','f8'),
+                             ('Irc_input','f8'),
+                             ('Icc_input','f8'),
+                             ('Irr_meas','f8'),
+                             ('Irc_meas','f8'),
+                             ('Icc_meas','f8')])
         return data
 
     def dir(self):
@@ -86,7 +86,7 @@ class CovarVsInput:
         return path_join(dir,epsfile)
 
 
-    def measure_covar(self):
+    def measure_cov(self):
         """
         
         Test the measured covariance matrix vs the input
@@ -383,12 +383,12 @@ def subpixel_file(ellip, theta, type='fits'):
     return f
 
 def subpixel_struct(nsigma, n_nsub):
-    dt=[('sigma','f4'),
-        ('nsub','f4',n_nsub),
-        ('Irr','f4',n_nsub),
-        ('Irc','f4',n_nsub),
-        ('Icc','f4',n_nsub),
-        ('a4','f4',n_nsub)]
+    dt=[('sigma','f8'),
+        ('nsub','f8',n_nsub),
+        ('Irr','f8',n_nsub),
+        ('Irc','f8',n_nsub),
+        ('Icc','f8',n_nsub),
+        ('a4','f8',n_nsub)]
     return zeros(nsigma, dtype=dt)
 
 
