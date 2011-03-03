@@ -48,8 +48,9 @@ class ReGauss(dict):
         self.verbose=keys.get('verbose',False)
         self.debug=keys.get('debug',False)
 
-        print("  -> ReGauss admom nsub:",self.admom_nsub)
-        print("  -> ReGauss image nsub:",self.image_nsub)
+        if self.verbose:
+            print("  -> ReGauss admom nsub:",self.admom_nsub)
+            print("  -> ReGauss image nsub:",self.image_nsub)
 
         self.check_init()
 
@@ -160,6 +161,7 @@ class ReGauss(dict):
 
         self.make_f0()
         if self.f0 == None:
+            self['rgstats'] = {'f0flags':2**0}
             return
 
         self.make_epsilon()
@@ -182,6 +184,7 @@ class ReGauss(dict):
                           guess=guess,
                           nsub=self.admom_nsub)
 
+        out['f0flags'] = 0
         self['rgstats'] = out
 
         if self.verbose:
@@ -225,7 +228,8 @@ class ReGauss(dict):
                 plt.show()
                 #k=raw_input('hit a key: ')
         else:
-            print("Found det(f0) less than tolerance:",det_f0,"<",self.detf0_tol)
+            if self.verbose:
+                print("Found det(f0) less than tolerance:",det_f0,"<",self.detf0_tol)
 
     def make_epsilon(self):
         """
@@ -322,6 +326,9 @@ class ReGauss(dict):
         if 'rgstats' not in self or 'psfstats' not in self:
             return
         if self['psfstats'] is None or self['rgstats'] is None:
+            return
+        if len(self['rgstats']) == 1:
+            # this is when we couldn't make f0
             return
 
         if self['psfstats']['whyflag'] != 0 or self['rgstats']['whyflag'] != 0:
