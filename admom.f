@@ -1,5 +1,5 @@
 c vim: set filetype=fortran et ts=2 sw=2 sts=2 :
-c       Heavily Modified a little from Phil Fischer's original code by 
+c       Heavily Modified a from Phil Fischer's original code by 
 c       Now has the right corrections for sub-pixel integration
 c           Erin Sheldon
 c
