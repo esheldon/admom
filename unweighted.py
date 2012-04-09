@@ -5,8 +5,8 @@ except:
 
 from numpy import sqrt
 def correct(image, psf):
-    mom_image = fimage.stat.fmom(image)
-    mom_psf = fimage.stat.fmom(psf)
+    mom_image = fimage.statistics.fmom(image)
+    mom_psf = fimage.statistics.fmom(psf)
 
     # simply subtract the covariance matrix
     
