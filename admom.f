@@ -378,7 +378,7 @@ c         4-sigma region around object, but within image
 
       subroutine ad_momf8(image,nx,ny,sky,sigsky,ax,ay,nel,shiftmax,
      &nsub,
-     &ixx,ixy,iyy,rho4,wcenx,wceny,uncer,numiter,whyflag)
+     &ixx,ixy,iyy,rho4,wcenx,wceny,uncer,s2n,numiter,whyflag)
 
 c     calculates adaptive moments
 c     applies pixelization corrections
@@ -390,7 +390,7 @@ c     applies pixelization corrections
       real*8 image(nx,ny)
       real*8 ax(nel),ay(nel)
       real*8 ixx(nel),iyy(nel),ixy(nel)
-      real*8 sky(nel),uncer(nel),sigsky(nel),rho4(nel)
+      real*8 sky(nel),uncer(nel),s2n(nel),sigsky(nel),rho4(nel)
       real*8 shiftmax
       real*8 wcenx(nel),wceny(nel)
       integer numiter(nel),whyflag(nel)
@@ -407,7 +407,7 @@ c     applies pixelization corrections
       real*8 w(2,2),m(2,2),n(2,2)
       real*8 xcen,ycen
       real*8 sumx,sumy,grad,expon,weight,detm,detw,detn,sums4
-      real*8 spi,sumxx,sumyy,sumxy,sum,w1,w2,w12
+      real*8 spi,sumxx,sumyy,sumxy,sum,wsumtot,w1,w2,w12
 
       integer kk
       real*8 e1old,e2old,m11old
@@ -425,7 +425,8 @@ c     I changed tol1 from 0.01 to 0.001 to agree with the C code
 
       if (nsub <= 0) then
         do kk=1,nel
-          call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+          call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                   uncer(kk),s2n(kk))
           whyflag(kk)=2**9
         enddo
         return
@@ -475,7 +476,8 @@ c         4-sigma region around object, but within image
           detw=w(1,1)*w(2,2)-w(1,2)*w(1,2)
 
           if(detw.le.0.)then
-            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                     uncer(kk),s2n(kk))
             numiter(kk)=imom
             whyflag(kk)=2**8
             goto 9090
@@ -536,7 +538,8 @@ c         4-sigma region around object, but within image
           enddo
 
           if(sum.le.0.)then
-            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                     uncer(kk),s2n(kk))
             numiter(kk)=imom
             whyflag(kk)=2**0
             goto 9090
@@ -547,7 +550,8 @@ c         4-sigma region around object, but within image
 
           if(abs(xcen-xcenorig).gt.shiftmax.or.
      &    abs(ycen-ycenorig).gt.shiftmax)then
-            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                     uncer(kk),s2n(kk))
             numiter(kk)=imom
             whyflag(kk)=2**1
             goto 9090
@@ -556,6 +560,7 @@ c         4-sigma region around object, but within image
           ! now with the new centroid, measure the weighted moments
           ! with sub-pixel corrections
           sum=0.
+          wsumtot=0.
           do i=ix1,ix2
             x=i-xcen
             xl=x-offset
@@ -605,13 +610,15 @@ c         4-sigma region around object, but within image
                 sumyy = sumyy + ymod*wwsumyy/wsum
                 sums4 = sums4 + ymod*wwexpon2sum/wsum
                 sum = sum + ymod*w2sum/wsum
+                wsumtot = wsumtot + w2sum/wsum
               endif
 
             enddo
           enddo
 
           if(sum.le.0.)then
-            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                     uncer(kk),s2n(kk))
             numiter(kk)=imom
             whyflag(kk)=2**2
             goto 9090
@@ -621,7 +628,8 @@ c         4-sigma region around object, but within image
           m(2,2)=sumyy/sum
           m(1,2)=sumxy/sum
           if(m(1,1).le.0..and.m(2,2).le.0.)then
-            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                     uncer(kk),s2n(kk))
             numiter(kk)=imom
             whyflag(kk)=2**3
             goto 9090
@@ -648,6 +656,11 @@ c         4-sigma region around object, but within image
             else
               uncer(kk)=9999.
             endif
+            if (wsumtot .gt. 0.) then
+              s2n(kk)=sum/sqrt(wsumtot)/sigsky(kk)
+            else
+              s2n(kk)=-9999.
+            endif
             wcenx(kk)=xcen
             wceny(kk)=ycen
             numiter(kk)=imom
@@ -657,7 +670,8 @@ c         4-sigma region around object, but within image
 
             detm=(m(1,1)*m(2,2)-m(1,2)*m(1,2))
             if(detm.le.1.e-7)then
-              call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+              call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                       uncer(kk),s2n(kk))
               numiter(kk)=imom
               whyflag(kk)=2**4
               goto 9090
@@ -674,7 +688,8 @@ c         4-sigma region around object, but within image
             detn=n(1,1)*n(2,2)-n(1,2)*n(1,2)
             
             if(detn.le.0.)then
-              call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+              call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                       uncer(kk),s2n(kk))
               numiter(kk)=imom
               whyflag(kk)=2**5
               goto 9090
@@ -691,7 +706,8 @@ c         4-sigma region around object, but within image
           endif
 
           if(w(1,1).lt.0..or.w(2,2).lt.0.)then
-            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+            call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                     uncer(kk),s2n(kk))
             numiter(kk)=imom
             whyflag(kk)=2**6
             goto 9090
@@ -700,7 +716,8 @@ c         4-sigma region around object, but within image
         enddo
         
         if(imom.eq.maxit)then
-          call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),uncer(kk))
+          call setbad_f8(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
+     &                   uncer(kk),s2n(kk))
           numiter(kk)=imom
           whyflag(kk)=2**7
           goto 9090
@@ -716,15 +733,16 @@ c         4-sigma region around object, but within image
 
 
 
-      subroutine setbad_f8(ixx,iyy,ixy,rho4,uncer)
+      subroutine setbad_f8(ixx,iyy,ixy,rho4,uncer,s2n)
       
-      real*8 ixx,iyy,ixy,rho4,uncer
+      real*8 ixx,iyy,ixy,rho4,uncer,s2n
 
       ixx=-9999.0
       iyy=-9999.0
       ixy=-9999.0
       rho4=-9999.0
       uncer=9999.0
+      s2n=-9999.
 
       return
 

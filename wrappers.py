@@ -98,6 +98,7 @@ def admom(image, row, col,
     Icc = numpy.zeros(row.size, dtype=dt)
     rho4 = numpy.zeros(row.size, dtype=dt)
     uncer = numpy.zeros(row.size, dtype=dt)
+    s2n = numpy.zeros(row.size, dtype=dt)
 
     numiter = numpy.zeros(row.size, dtype='i4')
 
@@ -119,7 +120,7 @@ def admom(image, row, col,
                          Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,whyflag)
     else:
         _admomf.ad_momf8(image,sky,sigsky,row,col,shiftmax,nsub,
-                         Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,whyflag)
+                         Irr,Irc,Icc,rho4,wrow,wcol,uncer,s2n,numiter,whyflag)
 
                      
     row -= 1
@@ -160,6 +161,7 @@ def admom(image, row, col,
          'a4':a4, 
          's2':s2,
          'uncer':uncer,
+         's2n':s2n,
          'numiter':numiter,
          'wrow':wrow,
          'wcol':wcol,
