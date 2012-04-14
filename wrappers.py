@@ -23,7 +23,6 @@ def admom(image, row, col,
           sky=0.0, sigsky=1.0, 
           guess=None,
           shiftmax=5.0,
-          always=False,
           nsub=4):
     """
     Name:
@@ -36,7 +35,7 @@ def admom(image, row, col,
 
     Inputs:
         image: 
-            A two-dimensional image.  It will be converted if it is not 4-byte
+            A two-dimensional image.  It will be converted if it is not 8-byte
             float or fortran order.
         row, col: 
             The center or centers for which moments are to be measured.
@@ -72,12 +71,7 @@ def admom(image, row, col,
     if len(image.shape) != 2:
         raise ValueError("image must be 2-dimensional")
 
-    dt = numpy.dtype(image.dtype)
-    if dt.name == 'float32':
-        dt='f4'
-    else:
-        # If image is not f8, will convert to f8 internally
-        dt='f8'
+    dt='f8'
 
     is_scalar=numpy.isscalar(row)
 
@@ -108,19 +102,15 @@ def admom(image, row, col,
     interpolated=numpy.zeros(row.size, dtype='i2')
 
     whyflag = numpy.zeros(row.size, dtype='i4')
-    whystr = numpy.zeros(row.size, dtype='S5')
+    whystr = numpy.zeros(row.size, dtype='S10')
 
     if guess is not None:
         Irr[:] = guess
         Icc[:] = guess
             
     nsub=int(nsub)
-    if dt == 'f4':
-        _admomf.ad_momf4(image,sky,sigsky,row,col,shiftmax,nsub,
-                         Irr,Irc,Icc,rho4,wrow,wcol,uncer,numiter,whyflag)
-    else:
-        _admomf.ad_momf8(image,sky,sigsky,row,col,shiftmax,nsub,
-                         Irr,Irc,Icc,rho4,wrow,wcol,uncer,s2n,numiter,whyflag)
+    _admomf.ad_mom(image,sky,sigsky,row,col,shiftmax,nsub,
+                   Irr,Irc,Icc,rho4,wrow,wcol,uncer,s2n,numiter,whyflag)
 
                      
     row -= 1
