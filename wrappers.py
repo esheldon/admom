@@ -170,6 +170,176 @@ def admom(image, row, col,
                 out[key] = out[key][0]
     return out
 
+
+def admom_1psf(image, row, col, Irr_psf, Irc_psf, Icc_psf,
+               sky=0.0, sigsky=1.0, 
+               guess=None,
+               shiftmax=5.0,
+               nsub=4):
+    """
+    Name:
+        admom
+    Purpose:
+        Calculate adaptive moments on the input image.
+    Calling Sequence:
+        res = admom(image, row, col, sky=0.0, sigsky=None, guess=None,
+                    shiftmax=5.0)
+
+    Inputs:
+        image: 
+            A two-dimensional image.  It will be converted if it is not 8-byte
+            float or fortran order.
+        row, col: 
+            The center or centers for which moments are to be measured.
+    Keywords:
+        sky: 
+            The sky value in the image.  Can be a scalar or array of the same
+            length as the row,col centers. Default is 0.0
+        sigsky: 
+            The sigma of the sky in the image.  Can be a scalar or array of the
+            same length as the row,col centers.  This is only used for error
+            calculations.  Default is 1.0
+
+        guess: 
+            A guess for the second order moments, Ixx or Iyy.  The same
+            value is used as a guess for both.  This would be ~sigma**2
+
+        shiftmax: 
+            Maximum allowed shift of the centroid in pixels.
+        nsub:
+
+            Corrections for sub-pixel effects will be calculated on a nsubXnsub
+            grid on each pixel.  Default is 4x4.  The error for small objects
+            can especially be problematic for nsub < 4. nsub=4 will acheive
+            0.5% accuracy even for sigma=1 pixel objects.  For very large
+            objects you can get way with no corrections at all (nsub=1)
+
+    Outputs:
+        A dictionary containing
+            Irr,Irc,Icc,e1,e2,uncer,rho4,whyflag,wrow,wcol
+        As well as most of the inputs.
+    """
+
+    if len(image.shape) != 2:
+        raise ValueError("image must be 2-dimensional")
+
+    dt='f8'
+
+    is_scalar=numpy.isscalar(row)
+
+    row = numpy.array(row, ndmin=1, copy=True, dtype=dt)
+    col = numpy.array(col, ndmin=1, copy=True, dtype=dt)
+
+    Irr_psf = numpy.array(Irr_psf, ndmin=1, copy=False, dtype=dt)
+    Irc_psf = numpy.array(Irc_psf, ndmin=1, copy=False, dtype=dt)
+    Icc_psf = numpy.array(Icc_psf, ndmin=1, copy=False, dtype=dt)
+
+    if (Irr_psf.size != row.size 
+            or Irc_psf.size != row.size 
+            or Icc_psf.size != row.size):
+        raise ValueError("psf arrays must be same size as row,col arrays")
+
+    # add 1 for fortran index
+    row += 1
+    col += 1
+    
+    if col.size != row.size:
+        raise ValueError("row and col must be same size")
+
+    sky,sigsky = get_sky_sigsky(row.size, sky, sigsky)
+
+
+    Irr = numpy.zeros(row.size, dtype=dt)
+    Irc = numpy.zeros(row.size, dtype=dt)
+    Icc = numpy.zeros(row.size, dtype=dt)
+    rho4 = numpy.zeros(row.size, dtype=dt)
+    uncer = numpy.zeros(row.size, dtype=dt)
+    s2n = numpy.zeros(row.size, dtype=dt)
+
+    numiter = numpy.zeros(row.size, dtype='i4')
+
+    wrow = numpy.zeros(row.size, dtype=dt) - 9999.
+    wcol = numpy.zeros(row.size, dtype=dt) - 9999.
+
+    interpolated=numpy.zeros(row.size, dtype='i2')
+
+    whyflag = numpy.zeros(row.size, dtype='i4')
+    whystr = numpy.zeros(row.size, dtype='S10')
+
+    if guess is not None:
+        Irr[:] = guess
+        Icc[:] = guess
+            
+    nsub=int(nsub)
+    _admomf.ad_mom_1psf(image,sky,sigsky,row,col,shiftmax,
+                        Irr_psf, Irc_psf, Icc_psf,
+                        nsub,
+                        Irr,Irc,Icc,rho4,wrow,wcol,uncer,s2n,numiter,whyflag)
+
+                     
+    row -= 1
+    col -= 1
+    w,=numpy.where((wrow >= 1) & (wcol >= 1))
+    if w.size > 0:
+        wrow[w] -= 1
+        wcol[w] -= 1
+
+    e1 = numpy.zeros(row.size, dtype=dt) + -9999.0
+    e2 = numpy.zeros(row.size, dtype=dt) + -9999.0
+    a4 = numpy.zeros(row.size, dtype=dt) + -9999.0
+    s2 = numpy.zeros(row.size, dtype=dt) + -9999.0
+    w,=numpy.where(whyflag == 0)
+    if w.size > 0:
+        a4[w] = rho4[w]/2.0 - 1.0
+
+        s2[w] = (Irr[w]+Icc[w])*(1-a4[w])/(1+a4[w])
+
+        T = Irr + Icc
+        w2, = numpy.where(T[w] > 0)
+        if w2.size > 0:
+            w2 = w[w2]
+            e1[w2] = (Icc[w2] - Irr[w2])/T[w2]
+            e2[w] = 2.0*Irc[w2]/T[w2]
+
+    for i in xrange(row.size):
+        whystr[i] = flagmap[whyflag[i]]
+
+    out={'row':row,
+         'col':col,
+         'Irr':Irr,
+         'Irc':Irc,
+         'Icc':Icc,
+         'Irr_psf':Irr_psf,
+         'Irc_psf':Irc_psf,
+         'Icc_psf':Icc_psf,
+         'e1':e1,
+         'e2':e2,
+         'rho4':rho4,
+         'a4':a4, 
+         's2':s2,
+         'uncer':uncer,
+         's2n':s2n,
+         'numiter':numiter,
+         'wrow':wrow,
+         'wcol':wcol,
+         'nsub':nsub,
+         'whyflag':whyflag,
+         'whystr':whystr,
+         'shiftmax':shiftmax,
+         'sky':sky,
+         'sigsky':sigsky}
+
+    if guess is not None:
+        out['guess'] = numpy.array(guess, ndmin=1, copy=False, dtype='f4')
+    if is_scalar:
+        for key in out:
+            if key not in ['shiftmax','nsub']:
+                out[key] = out[key][0]
+    return out
+
+
+
+
 def get_sky_sigsky(n, sky, sigsky):
     if sky is None:
         sky = numpy.zeros(n, dtype='f4')

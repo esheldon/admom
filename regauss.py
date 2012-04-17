@@ -218,9 +218,6 @@ class ReGauss(dict):
             self.f0 = fimage.model_image('gauss',self.image.shape,[wrow,wcol],
                                          [Irr_f0, Irc_f0, Icc_f0],
                                          counts=imcounts,nsub=self.image_nsub)
-            #self.f0 = imsim.mom2disk('gauss',
-            #                         Irr_f0, Irc_f0, Icc_f0, self.image.shape, 
-            #                         cen=[wrow,wcol], counts=imcounts)
 
             if self.debug:
                 plt=images.multiview(self.f0,show=False,levels=7)
@@ -252,8 +249,7 @@ class ReGauss(dict):
 
         row = (self.psf.shape[0]-1)/2
         col = (self.psf.shape[1]-1)/2
-        #gauss = imsim.mom2disk('gauss',Irr,Irc,Icc,self.psf.shape,
-        #                       cen=[row,col], counts=1)
+        # why are we not using nsub=self.image_nsub here?
         gauss = fimage.model_image('gauss',self.psf.shape,[row,col],
                                    [Irr,Irc,Icc],counts=1)
         

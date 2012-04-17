@@ -13,7 +13,7 @@ from __future__ import print_function
 
 import numpy
 from numpy import linspace,array,zeros,sqrt,log10,sin
-from .wrappers import admom
+from .wrappers import admom, admom_1psf
 
 import os
 import esutil as eu
@@ -430,3 +430,31 @@ def testfit():
 
     plt.show()
 
+def test_psf1():
+    """
+    Test the code where we input the psf moments
+    """
+    import fimage
+    psf_ixx=1.5
+    psf_ixy=0.3
+    psf_iyy=2.0
+
+    ixx = 2.0
+    ixy = 0.0
+    iyy = 2.3
+    dims=[31,31]
+    cen=[15,15]
+    image = fimage.model_image('gauss',dims,cen,
+                               [ixx+psf_ixx,ixy+psf_ixy,iyy+psf_iyy],
+                               counts=1)
+    res_comb = admom(image, cen[0], cen[1])
+    res = admom_1psf(image, cen[0], cen[1], psf_ixx, psf_ixy, psf_iyy)
+
+
+    print("Ixx input:",ixx,"Ixx meas:",res['Irr'])
+    print("Ixy input:",ixy,"Ixy meas:",res['Irc'])
+    print("Iyy input:",iyy,"Iyy meas:",res['Icc'])
+
+    print("Ixx comb input:",ixx+psf_ixx,"Ixx meas:",res_comb['Irr'])
+    print("Ixy comb input:",ixy+psf_ixy,"Ixy meas:",res_comb['Irc'])
+    print("Iyy comb input:",iyy+psf_iyy,"Iyy meas:",res_comb['Icc'])
