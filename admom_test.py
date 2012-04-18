@@ -435,26 +435,26 @@ def test_psf1():
     Test the code where we input the psf moments
     """
     import fimage
-    psf_ixx=1.5
-    psf_ixy=0.3
-    psf_iyy=2.0
+    psf_irr=1.5
+    psf_irc=0.3
+    psf_icc=2.0
 
-    ixx = 2.0
-    ixy = 0.0
-    iyy = 2.3
+    irr = 2.0
+    irc = 0.0
+    icc = 2.3
     dims=[31,31]
     cen=[15,15]
     image = fimage.model_image('gauss',dims,cen,
-                               [ixx+psf_ixx,ixy+psf_ixy,iyy+psf_iyy],
+                               [irr+psf_irr,irc+psf_irc,icc+psf_icc],
                                counts=1)
     res_comb = admom(image, cen[0], cen[1])
-    res = admom_1psf(image, cen[0], cen[1], psf_ixx, psf_ixy, psf_iyy)
+    res = admom_1psf(image, cen[0], cen[1], psf_irr, psf_irc, psf_icc)
 
 
-    print("Ixx input:",ixx,"Ixx meas:",res['Irr'])
-    print("Ixy input:",ixy,"Ixy meas:",res['Irc'])
-    print("Iyy input:",iyy,"Iyy meas:",res['Icc'])
+    print("Irr input:",irr,"Irr meas:",res['Irr'])
+    print("Irc input:",irc,"Irc meas:",res['Irc'])
+    print("Icc input:",icc,"Icc meas:",res['Icc'])
 
-    print("Ixx comb input:",ixx+psf_ixx,"Ixx meas:",res_comb['Irr'])
-    print("Ixy comb input:",ixy+psf_ixy,"Ixy meas:",res_comb['Irc'])
-    print("Iyy comb input:",iyy+psf_iyy,"Iyy meas:",res_comb['Icc'])
+    print("Irr comb input:",irr+psf_irr,"Irr meas:",res_comb['Irr'])
+    print("Irc comb input:",irc+psf_irc,"Irc meas:",res_comb['Irc'])
+    print("Icc comb input:",icc+psf_icc,"Icc meas:",res_comb['Icc'])
