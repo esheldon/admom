@@ -153,8 +153,6 @@ c         4-sigma region around object, but within image
 
                   expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
 
-                  ! the fortran I'm using is actually ok with very
-                  ! large exponents
                   weight=exp(-0.5*expon)
                   weight2 = weight*weight
 
@@ -228,8 +226,6 @@ c         4-sigma region around object, but within image
 
                   expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
 
-                  ! the fortran I'm using is actually ok with very
-                  ! large exponents
                   weight=exp(-0.5*expon)
                   weight2 = weight*weight
 
@@ -532,8 +528,6 @@ c         4-sigma region around object, but within image
 
                   expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
 
-                  ! the fortran I'm using is actually ok with very
-                  ! large exponents
                   weight=exp(-0.5*expon)
                   weight2 = weight*weight
 
@@ -607,8 +601,6 @@ c         4-sigma region around object, but within image
 
                   expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
 
-                  ! the fortran I'm using is actually ok with very
-                  ! large exponents
                   weight=exp(-0.5*expon)
                   weight2 = weight*weight
 

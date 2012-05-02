@@ -217,7 +217,8 @@ class ReGauss(dict):
             wcol = self['imstats']['wcol']
             self.f0 = fimage.model_image('gauss',self.image.shape,[wrow,wcol],
                                          [Irr_f0, Irc_f0, Icc_f0],
-                                         counts=imcounts,nsub=self.image_nsub)
+                                         counts=imcounts,
+                                         nsub=self.image_nsub)
 
             if self.debug:
                 plt=images.multiview(self.f0,show=False,levels=7)
@@ -251,7 +252,7 @@ class ReGauss(dict):
         col = (self.psf.shape[1]-1)/2
         # why are we not using nsub=self.image_nsub here?
         gauss = fimage.model_image('gauss',self.psf.shape,[row,col],
-                                   [Irr,Irc,Icc],counts=1)
+                                   [Irr,Irc,Icc],counts=1,nsub=self.image_nsub)
         
         # need both our gaussian and the psf to be normalized
         tpsf = self.psf/self.psf.sum()
