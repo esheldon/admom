@@ -49,7 +49,7 @@ c     applies pixelization corrections
       real*8 w(2,2),m(2,2),n(2,2)
       real*8 xcen,ycen
       real*8 sumx,sumy,grad,expon,weight,detm,detw,detn,sums4
-      real*8 spi,sumxx,sumyy,sumxy,sum,wsumtot,w1,w2,w12
+      real*8 spi,sumxx,sumyy,sumxy,sum,wsum2tot,w1,w2,w12
 
       integer kk
       real*8 e1old,e2old,m11old
@@ -202,7 +202,7 @@ c         4-sigma region around object, but within image
           ! now with the new centroid, measure the weighted moments
           ! with sub-pixel corrections
           sum=0.
-          wsumtot=0.
+          wsum2tot=0.
           do i=ix1,ix2
             x=i-xcen
             xl=x-offset
@@ -252,7 +252,7 @@ c         4-sigma region around object, but within image
                 sumyy = sumyy + ymod*wwsumyy/wsum
                 sums4 = sums4 + ymod*wwexpon2sum/wsum
                 sum = sum + ymod*w2sum/wsum
-                wsumtot = wsumtot + w2sum/wsum
+                wsum2tot = wsum2tot + (w2sum/wsum)**2
               endif
 
             enddo
@@ -298,8 +298,8 @@ c         4-sigma region around object, but within image
             else
               uncer(kk)=9999.
             endif
-            if (wsumtot .gt. 0.) then
-              s2n(kk)=sum/sqrt(wsumtot)/sigsky(kk)
+            if (wsum2tot .gt. 0.) then
+              s2n(kk)=sum/sqrt(wsum2tot)/sigsky(kk)
             else
               s2n(kk)=-9999.
             endif
