@@ -35,6 +35,9 @@ def mom2sigma(T):
     return sigma
 
 def sigma2mom(sigma):
+    """
+    Convert sigma to T=Ixx+Iyy
+    """
     T = 2*sigma**2
     return T
 
