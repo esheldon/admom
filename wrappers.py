@@ -23,7 +23,7 @@ def admom(image, row, col,
           sky=0.0, sigsky=1.0, 
           guess=None,
           shiftmax=5.0,
-          nsub=4):
+          nsub=1):
     """
     Name:
         admom
@@ -57,10 +57,11 @@ def admom(image, row, col,
         nsub:
 
             Corrections for sub-pixel effects will be calculated on a nsubXnsub
-            grid on each pixel.  Default is 4x4.  The error for small objects
-            can especially be problematic for nsub < 4. nsub=4 will acheive
-            0.5% accuracy even for sigma=1 pixel objects.  For very large
-            objects you can get way with no corrections at all (nsub=1)
+            grid on each pixel.  Default is no sub-pixel, 1x1  The error for
+            small objects can especially be problematic for nsub < 4. nsub=4
+            will acheive 0.5% accuracy even for sigma=1 pixel objects.  Note
+            for lensing you may always want 1x1 to get the pixel convolution in
+            the psf fit.
 
     Outputs:
         A dictionary containing
