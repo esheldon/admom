@@ -37,8 +37,6 @@ class ReGauss(dict):
         self.psf = psf
 
         self.conv = keys.get('conv','fft')
-        self.image_nsub=keys.get('image_nsub',16)
-        self.admom_nsub=keys.get('admom_nsub',4)
         self.sigsky = keys.get('sigsky', 1.0)
         self.guess=keys.get('guess', None)
         self.guess_psf=keys.get('guess_psf',None)
@@ -47,10 +45,6 @@ class ReGauss(dict):
 
         self.verbose=keys.get('verbose',False)
         self.debug=keys.get('debug',False)
-
-        if self.verbose:
-            print("  -> ReGauss admom nsub:",self.admom_nsub)
-            print("  -> ReGauss image nsub:",self.image_nsub)
 
         self.check_init()
 
@@ -101,8 +95,7 @@ class ReGauss(dict):
                           self.col, 
                           sky=0.0,
                           sigsky=self.sigsky,
-                          guess=self.guess,
-                          nsub=self.admom_nsub)
+                          guess=self.guess)
 
         self['imstats'] = out
         if self.verbose:
@@ -118,8 +111,7 @@ class ReGauss(dict):
                           row, 
                           col, 
                           sky=0, 
-                          guess=self.guess_psf,
-                          nsub=self.admom_nsub)
+                          guess=self.guess_psf)
 
         self['psfstats'] = out
         if self.verbose:
@@ -181,8 +173,7 @@ class ReGauss(dict):
                           wcol,
                           sky=0.0,
                           sigsky=self.sigsky,
-                          guess=guess,
-                          nsub=self.admom_nsub)
+                          guess=guess)
 
         out['f0flags'] = 0
         self['rgstats'] = out
@@ -217,8 +208,7 @@ class ReGauss(dict):
             wcol = self['imstats']['wcol']
             self.f0 = fimage.model_image('gauss',self.image.shape,[wrow,wcol],
                                          [Irr_f0, Irc_f0, Icc_f0],
-                                         counts=imcounts,
-                                         nsub=self.image_nsub)
+                                         counts=imcounts)
 
             if self.debug:
                 plt=images.multiview(self.f0,show=False,levels=7)
@@ -250,9 +240,9 @@ class ReGauss(dict):
 
         row = (self.psf.shape[0]-1)/2
         col = (self.psf.shape[1]-1)/2
-        # why are we not using nsub=self.image_nsub here?
+
         gauss = fimage.model_image('gauss',self.psf.shape,[row,col],
-                                   [Irr,Irc,Icc],counts=1,nsub=self.image_nsub)
+                                   [Irr,Irc,Icc],counts=1)
         
         # need both our gaussian and the psf to be normalized
         tpsf = self.psf/self.psf.sum()
@@ -353,82 +343,52 @@ class ReGauss(dict):
 
 
 
-def test_regauss(gal_ellip, gal_theta, psfinfo=None, show=True):
+def test_regauss(gal_model='gauss',
+                 gal_T=16.0,
+                 gal_e1=0.0,
+                 gal_e2=0.0,
+                 psf_T=4.0,
+                 psf_e1=0.0,
+                 psf_e2=0.0,
+                 show=True):
+
     from pprint import pprint
+    import fimage
 
-    psfinfo_def = {'seeing':2.0,
-                   'ellip':0.0,
-                   'theta':0.0,
-                   'type':'dgauss',
-                   'Tratio':2.0, # size2/size1
-                   'fluxfrac1': 0.8}
+    nsigma=5
 
-    if psfinfo is not None:
-        for key in psfinfo_def:
-            if key not in psfinfo:
-                psfinfo[key] = psfinfo_def[key]
-    else:
-        psfinfo=psfinfo_def
+    psf_sigma=numpy.sqrt(psf_T/2.)
+    psf_imsize = int( round(2*nsigma*psf_sigma) )
+    if (psf_imsize % 2) == 0:
+        psf_imsize+=1
 
-    pixscale = 0.4 
+    psf_dims=[psf_imsize]*2
+    psf_cen=[(psf_imsize-1)/2.]*2
+    psf_moms = admom.ellip2mom(psf_T,e1=psf_e1,e2=psf_e2)
+    psf = fimage.model_image('gauss', 
+                             psf_dims,
+                             psf_cen,
+                             psf_moms,
+                             nsub=16)
 
-    # for a double gauss, this is the info for the primary gaussian
-    Tpsf = admom.fwhm2mom(psfinfo['seeing'], pixscale=pixscale) 
-    psf_ellip = 0.0
-    psf_theta = 0.0
-    psf_e1 = psfinfo['ellip']*cos(2*psfinfo['theta']*PI/180.0)
-    psf_e2 = psfinfo['ellip']*sin(2*psfinfo['theta']*PI/180.0)
-    Irr_psf, Irc_psf, Icc_psf = admom.ellip2mom(Tpsf, e=psf_ellip, theta=psf_theta)
-
-    if psfinfo['type'] == 'gauss':
-        psf_sigma = admom.mom2sigma(Tpsf)
-        psf_imsize = int( round(2*4*psf_sigma) )
-        if (psf_imsize % 2) == 0:
-            psf_imsize+=1
-        psf = imsim.mom2disk('gauss', Irr_psf, Irc_psf, Icc_psf, [psf_imsize,psf_imsize])
-
-    else:
-        psf_sigma2 = admom.mom2sigma(psfinfo['Tratio']*(Irr_psf+Icc_psf))
-        psf_imsize = int( round(2*4*psf_sigma2) )
-        if (psf_imsize % 2) == 0:
-            psf_imsize+=1
-
-        psf = imsim.mom2dgauss(Irr_psf, Irc_psf, Icc_psf, psfinfo['Tratio'], 
-                               psfinfo['fluxfrac1'], [psf_imsize,psf_imsize])
-
-
-    # note this is relative to the primary psf gaussian for double
-    Tgal = 2*Tpsf
-    
-    Irr, Irc, Icc = admom.ellip2mom(Tgal, e=gal_ellip, theta=gal_theta)
-    e1,e2,Ttmp = admom.mom2ellip(Irr, Irc, Icc)
+    gal_moms = admom.ellip2mom(gal_T,e1=gal_e1,e2=gal_e2)
 
 
     # for the image size, make it big enough to easily fit
     # the *convolved* galaxy
-    gal_convolved_sigma = admom.mom2sigma(Tgal+Tpsf)
-    gal_imsize1 = int( round(2*4.5*gal_convolved_sigma) )
+    gal_convolved_sigma = admom.mom2sigma(gal_T+psf_T)
+    gal_imsize = int( round(2*nsigma*gal_convolved_sigma) )
+    if gal_imsize < psf_imsize:
+        gal_imsize = psf_imsize
 
-    # size purposefully lopsided
-    cen = [ (gal_imsize1-1)/2., (gal_imsize1-1)/1.5 ]
-    gal_imsize = [int(1.5*gal_imsize1), int(2.0*gal_imsize1)]
-    if gal_imsize[0] < psf_imsize: gal_imsize[0] = psf_imsize
-    if gal_imsize[1] < psf_imsize: gal_imsize[1] = psf_imsize
+    gal_cen  = [ (gal_imsize-1)/2. ]*2
+    gal_dims = [int(gal_imsize)]*2
 
-    #if gal_imsize[0] % 2 == 0: gal_imsize[0] += 1
-    #if gal_imsize[1] % 2 == 0: gal_imsize[1] += 1
-
-    gal = imsim.mom2disk('gauss', Irr, Irc, Icc, gal_imsize, cen=cen)
-    
-    res = admom.admom(gal, cen[0], cen[1], guess=Tgal/2, nsub=4)
-    print("gal_imsize:",gal_imsize)
-
-    print("psf  e1: %f  e2: %f\n" % (psf_e1,psf_e2))
-    print("gal  e1: %f  e2: %f" % (e1,e2))
-    print("meas e1: %f  e2: %f" % (res['e1'], res['e2']))
-
-    print("cen: ",cen[0],cen[1])
-    print("wcen:",res['wrow'],res['wcol'])
+    gal = fimage.model_image(gal_model,
+                             gal_dims,
+                             gal_cen,
+                             gal_moms,
+                             nsub=16)
 
     levels=7
 
@@ -440,7 +400,7 @@ def test_regauss(gal_ellip, gal_theta, psfinfo=None, show=True):
         images.multiview(gal, levels=levels)
         images.multiview(imconv, levels=levels)
 
-    rg = ReGauss(imconv, cen[0], cen[1], psf, guess=Tgal/2, guess_psf=Tpsf/2)
+    rg = ReGauss(imconv, gal_cen[0], gal_cen[1], psf, guess=gal_T/2, guess_psf=psf_T/2)
 
     rg.do_admom()
     print("admom stats")
@@ -457,4 +417,3 @@ def test_regauss(gal_ellip, gal_theta, psfinfo=None, show=True):
     rg.do_rg_corr()
     print("rg corrected stats")
     pprint(rg['rgcorrstats'])
-    print("gal  e1: %f  e2: %f" % (e1,e2))
