@@ -22,19 +22,25 @@ from . import unweighted
 from pprint import pprint
 
 class ReGauss(dict):
-    def __init__(self, image, row, col, psf, **keys):
+    def __init__(self, image, row, col, psf, psf_row, psf_col, **keys):
         '''
-        The psf must have odd dimention in pixels, e.g. [31,31] and the center must
-        be at [(nrow-1)/2, (ncol-1)/2]
+
+        It used to be that the psf must have odd dimention in pixels, e.g.
+        [31,31] and the center must be at [(nrow-1)/2, (ncol-1)/2].  I have
+        loosened this constraint...
 
         The image sky value must be zero.
         The psf sky value must be zero.
         '''
 
+        self.force_psf_odd = keys.get('force_psf_odd',False)
+
         self.image = image
         self.row=row
         self.col=col
         self.psf = psf
+        self.psf_row=psf_row
+        self.psf_col=psf_col
 
         self.conv = keys.get('conv','fft')
         self.sigsky = keys.get('sigsky', 1.0)
@@ -57,9 +63,10 @@ class ReGauss(dict):
         if len(self.psf.shape) != 2:
             raise ValueError("psf must be a 2-d image")
 
-        if (self.psf.shape[0] % 2) != 1 or (self.psf.shape[1] % 2) != 1:
-            raise ValueError("psf must have odd number of pixels in each "
-                             "dimension for FFT convolution")
+        if self.force_psf_odd:
+            if (self.psf.shape[0] % 2) != 1 or (self.psf.shape[1] % 2) != 1:
+                raise ValueError("psf must have odd number of pixels in each "
+                                 "dimension for FFT convolution")
 
         if (not numpy.isscalar(self.row) or not numpy.isscalar(self.col)
                 or not numpy.isscalar(self.sigsky)):
@@ -104,12 +111,10 @@ class ReGauss(dict):
 
 
     def do_psf_admom(self):
-        row = (self.psf.shape[0]-1)/2
-        col = (self.psf.shape[1]-1)/2
 
         out = admom.admom(self.psf, 
-                          row, 
-                          col, 
+                          self.psf_row, 
+                          self.psf_col, 
                           sky=0, 
                           guess=self.guess_psf)
 
