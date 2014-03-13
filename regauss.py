@@ -25,15 +25,15 @@ class ReGauss(dict):
     def __init__(self, image, row, col, psf, psf_row, psf_col, **keys):
         '''
 
-        It used to be that the psf must have odd dimention in pixels, e.g.
-        [31,31] and the center must be at [(nrow-1)/2, (ncol-1)/2].  I have
-        loosened this constraint...
+        for fft The psf must have odd dimention in pixels so ad not to shift the
+        centroid during convolution, e.g.  [31,31].  Having the center at
+        [(nrow-1)/2, (ncol-1)/2] is also nice.
 
         The image sky value must be zero.
         The psf sky value must be zero.
         '''
 
-        self.force_psf_odd = keys.get('force_psf_odd',False)
+        self.force_psf_odd = keys.get('force_psf_odd',True)
 
         self.image = image
         self.row=row
@@ -63,7 +63,7 @@ class ReGauss(dict):
         if len(self.psf.shape) != 2:
             raise ValueError("psf must be a 2-d image")
 
-        if self.force_psf_odd:
+        if self.conv=='fft' and self.force_psf_odd:
             if (self.psf.shape[0] % 2) != 1 or (self.psf.shape[1] % 2) != 1:
                 raise ValueError("psf must have odd number of pixels in each "
                                  "dimension for FFT convolution")
@@ -167,8 +167,13 @@ class ReGauss(dict):
         self.iprime = self.image - self.f0conv
 
         if self.debug:
-            images.compare_images(self.image, self.iprime, label1='original',label2='minus f0conv')
-            #k=raw_input('hit a key: ')
+            images.compare_images(self.image,
+                                  self.iprime,
+                                  label1='original',
+                                  label2='minus f0conv')
+            k=raw_input('hit a key (q to quit): ')
+            if k=='q':
+                stop
 
         guess = (self['imstats']['Irr'] + self['imstats']['Irr'])/2
         wrow = self['imstats']['wrow']
@@ -211,15 +216,12 @@ class ReGauss(dict):
         if det_f0 > self.detf0_tol:
             wrow = self['imstats']['wrow']
             wcol = self['imstats']['wcol']
-            self.f0 = fimage.model_image('gauss',self.image.shape,[wrow,wcol],
+            self.f0 = fimage.model_image('gauss',
+                                         self.image.shape,
+                                         [wrow,wcol],
                                          [Irr_f0, Irc_f0, Icc_f0],
+                                         nsub=1,
                                          counts=imcounts)
-
-            if self.debug:
-                plt=images.multiview(self.f0,show=False,levels=7)
-                plt.title='f0'
-                plt.show()
-                #k=raw_input('hit a key: ')
         else:
             if self.verbose:
                 print("Found det(f0) less than tolerance:",det_f0,"<",self.detf0_tol)
@@ -239,22 +241,31 @@ class ReGauss(dict):
         if 'psfstats' not in self:
             raise ValueError("run admom on psf first")
 
-        Irr = self['psfstats']['Irr']
-        Irc = self['psfstats']['Irc']
-        Icc = self['psfstats']['Icc']
+        pstats=self['psfstats']
 
-        row = (self.psf.shape[0]-1)/2
-        col = (self.psf.shape[1]-1)/2
+        Irr = pstats['Irr']
+        Irc = pstats['Irc']
+        Icc = pstats['Icc']
 
-        gauss = fimage.model_image('gauss',self.psf.shape,[row,col],
-                                   [Irr,Irc,Icc],counts=1)
+        #row = (self.psf.shape[0]-1)/2
+        #col = (self.psf.shape[1]-1)/2
+        row = pstats['wrow']
+        col = pstats['wcol']
+        #print('row:',row,'col:',col)
+        #print('wrow:',pstats['wrow'],'wcol:',pstats['wcol'])
+
+        gauss = fimage.model_image('gauss',
+                                   self.psf.shape,
+                                   [row,col],
+                                   [Irr,Irc,Icc],
+                                   nsub=1,
+                                   counts=1)
         
         # need both our gaussian and the psf to be normalized
         tpsf = self.psf/self.psf.sum()
 
         if self.debug:
             images.compare_images(tpsf, gauss, label1='psf',label2='gauss')
-            #k=raw_input('hit a key: ')
 
         epsilon = tpsf - gauss
 
@@ -289,7 +300,10 @@ class ReGauss(dict):
         if self.conv == 'fft':
             f0conv = scipy.signal.fftconvolve(f0_expand, ep, mode='same')
         else:
-            f0conv = scipy.signal.convolve2d(f0_expand, ep, old_behavior=False,mode='same')
+            f0conv = scipy.signal.convolve2d(f0_expand,
+                                             ep, 
+                                             #old_behavior=False,
+                                             mode='same')
 
         # trim back to the original size
         if (f0conv.shape[0] > self.image.shape[0] 
@@ -303,14 +317,8 @@ class ReGauss(dict):
         if self.debug:
             print("f0.shape",self.f0.shape)
             print("f0conv.shape",self.f0conv.shape)
-            plt=images.view(self.f0,show=False,levels=7)
-            plt.title='f0'
-            plt.show()
-            cplt=images.view(self.f0conv, show=False,levels=7)
-            cplt.title='f0conv'
-            cplt.show()
-            #images.compare_images(self.f0, self.f0conv, label1='f0',label2='f0conv')
-            #k=raw_input('hit a key: ')
+            images.multiview(self.f0,title='f0')
+            images.multiview(self.f0conv, title='f0conv')
 
 
     def do_rg_corr(self):
