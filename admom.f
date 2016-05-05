@@ -19,8 +19,8 @@ c       2**9: nsub is not a postive integer
 
 
       subroutine ad_mom(image,nx,ny,sky,sigsky,ax,ay,nel,shiftmax,
-     &nsub,
-     &ixx,ixy,iyy,rho4,wcenx,wceny,uncer,s2n,numiter,whyflag)
+     &nsub,maxit,
+     &isum,ixx,ixy,iyy,rho4,wcenx,wceny,uncer,s2n,numiter,whyflag)
 
 c     calculates adaptive moments
 c     applies pixelization corrections
@@ -31,7 +31,7 @@ c     applies pixelization corrections
       integer nel,nx,ny
       real*8 image(nx,ny)
       real*8 ax(nel),ay(nel)
-      real*8 ixx(nel),iyy(nel),ixy(nel)
+      real*8 isum(nel),ixx(nel),iyy(nel),ixy(nel)
       real*8 sky(nel),uncer(nel),s2n(nel),sigsky(nel),rho4(nel)
       real*8 shiftmax
       real*8 wcenx(nel),wceny(nel)
@@ -39,9 +39,7 @@ c     applies pixelization corrections
 
       real*8 x,y,xl,yl,xx,xx2,yy,yy2,td,e1,e2
       real*8 tol1,tol2
-      integer maxit
-
-      integer*4 nsub
+      integer*4 maxit, nsub
       real*8 stepsize, offset
 
       integer imom
@@ -62,7 +60,7 @@ c     applies pixelization corrections
       real*8 weight2
   
 c     I changed tol1 from 0.01 to 0.001 to agree with the C code
-      parameter(tol1=0.001,tol2=0.01,maxit=100)
+      parameter(tol1=0.001,tol2=0.01)
       
 
       if (nsub <= 0) then
@@ -283,6 +281,7 @@ c         4-sigma region around object, but within image
      &    abs(m(1,1)/m11old-1.).le.tol2)then
 
             ! convergence criteria met
+            isum(kk)=sum
             ixx(kk)=w(1,1)
             iyy(kk)=w(2,2)
             ixy(kk)=w(1,2)
@@ -393,8 +392,8 @@ c add moments from a psf to the moments we fit, in order
 c to account for PSF effects
       subroutine ad_mom_1psf(image,nx,ny,sky,sigsky,ax,ay,nel,shiftmax,
      &ixx_psf1,ixy_psf1,iyy_psf1,
-     &nsub,
-     &ixx,ixy,iyy,rho4,wcenx,wceny,uncer,s2n,numiter,whyflag)
+     &maxit,
+     &isum,ixx,ixy,iyy,rho4,wcenx,wceny,uncer,s2n,numiter,whyflag)
 
 c     calculates adaptive moments
 c     applies pixelization corrections
@@ -405,53 +404,33 @@ c     applies pixelization corrections
       integer nel,nx,ny
       real*8 image(nx,ny)
       real*8 ax(nel),ay(nel)
-      real*8 ixx(nel),iyy(nel),ixy(nel)
+      real*8 isum(nel),ixx(nel),iyy(nel),ixy(nel)
       real*8 ixx_psf1(nel),iyy_psf1(nel),ixy_psf1(nel)
       real*8 sky(nel),uncer(nel),s2n(nel),sigsky(nel),rho4(nel)
       real*8 shiftmax
       real*8 wcenx(nel),wceny(nel)
       integer numiter(nel),whyflag(nel)
 
-      real*8 x,y,xl,yl,xx,xx2,yy,yy2,td,e1,e2
+      real*8 x,y,xx,yy,td,e1,e2
       real*8 tol1,tol2
-      integer maxit
 
-      integer*4 nsub
-      real*8 stepsize, offset
+      integer*4 maxit
 
       integer imom
-      integer ix1,ix2,iy1,iy2,i,j,ii,jj
+      integer ix1,ix2,iy1,iy2,i,j
       real*8 w(2,2),m(2,2),n(2,2)
       real*8 xcen,ycen
-      real*8 sumx,sumy,grad,expon,weight,detm,detw,detn,sums4
-      real*8 spi,sumxx,sumyy,sumxy,sum,wsumtot,w1,w2,w12
+      real*8 sumx,sumy,grad,expon,weight,wdata,detm,detw,detn,sums4
+      real*8 spi,sumxx,sumyy,sumxy,sum,wsum2tot,w1,w2,w12
 
       integer kk
       real*8 e1old,e2old,m11old
       real*8 xcenorig,ycenorig
 
       real*8 ymod
-
-      real*8 wsum, w2sum, wwsumx, wwsumy
-      real*8 wwsumxx, wwsumxy, wwsumyy, wwexpon2sum
-      real*8 weight2
   
 c     I changed tol1 from 0.01 to 0.001 to agree with the C code
-      parameter(tol1=0.001,tol2=0.01,maxit=100)
-      
-
-      if (nsub <= 0) then
-        do kk=1,nel
-          call setbad(ixx(kk),iyy(kk),ixy(kk),rho4(kk),
-     &                uncer(kk),s2n(kk))
-          whyflag(kk)=2**9
-        enddo
-        return
-      endif
-
-c     for sub-pixel corrections
-      stepsize = 1./nsub
-      offset = (nsub-1)*stepsize/2.
+      parameter(tol1=0.001,tol2=0.01)
 
 c     The main do loop now
 
@@ -482,13 +461,6 @@ c         4-sigma region around object, but within image
           ix2=nint(min(xcen+grad+0.5,float(nx)))
           iy2=nint(min(ycen+grad+0.5,float(ny)))
 
-          sumxx=0.
-          sumyy=0.
-          sumxy=0.
-          sumx=0
-          sumy=0.
-          sum=0.
-          sums4=0.
 
           detw=w(1,1)*w(2,2)-w(1,2)*w(1,2)
 
@@ -505,49 +477,26 @@ c         4-sigma region around object, but within image
           w12=w(1,2)/detw
 
           ! first get the weighted centroid
+          sumx=0
+          sumy=0.
+          sum=0.
           do i=ix1,ix2
             x=i-xcen
-            xl=x-offset
+            xx=x*x
             do j=iy1,iy2
               y=j-ycen
-              yl=y-offset
+              yy=y*y
 
-              ! work over a 4x4 sub pixel grid
-              ! to compute pixel corrections
-              wsum=0
-              w2sum=0
-              wwsumx=0
-              wwsumy=0
+              ymod = image(i,j)-sky(kk)
 
-              xx=xl
-              do ii=1,nsub
-                xx2=xx*xx
-                yy=yl
-                do jj=1,nsub
-                  yy2=yy*yy
+              expon= xx*w2 + yy*w1 - 2.*x*y*w12
+              weight=exp(-0.5*expon)
 
-                  expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
+              wdata=weight*ymod
 
-                  weight=exp(-0.5*expon)
-                  weight2 = weight*weight
-
-                  wsum=wsum+weight
-                  w2sum = w2sum+weight2
-                  wwsumx=wwsumx + weight2*(xx+xcen)
-                  wwsumy=wwsumy + weight2*(yy+ycen)
-
-
-                  yy = yy + stepsize
-                enddo ! loop y sub pixels
-                xx = xx + stepsize
-              enddo ! loop x sub pixels
-
-              if (wsum .gt. 0) then
-                ymod = image(i,j)-sky(kk)
-                sumx = sumx + ymod*wwsumx/wsum
-                sumy = sumy + ymod*wwsumy/wsum
-                sum = sum + ymod*w2sum/wsum
-              endif
+              sum  = sum  + wdata
+              sumx = sumx + wdata*(x+xcen)
+              sumy = sumy + wdata*(y+ycen)
 
             enddo
           enddo
@@ -575,56 +524,34 @@ c         4-sigma region around object, but within image
           ! now with the new centroid, measure the weighted moments
           ! with sub-pixel corrections
           sum=0.
-          wsumtot=0.
+          sumxx=0.
+          sumyy=0.
+          sumxy=0.
+          sums4=0.
+          wsum2tot=0.
+
           do i=ix1,ix2
             x=i-xcen
-            xl=x-offset
+            xx=x*x
             do j=iy1,iy2
               y=j-ycen
-              yl=y-offset
+              yy=y*y
 
-              ! derive the correction factors from the subpixel
-              ! grid
-              wsum=0
-              w2sum=0
-              wwsumxx=0
-              wwsumxy=0
-              wwsumyy=0
-              wwexpon2sum=0
 
-              xx=xl
-              do ii=1,nsub
-                xx2=xx*xx
-                yy=yl
-                do jj=1,nsub
-                  yy2=yy*yy
+              ymod = image(i,j)-sky(kk)
 
-                  expon= xx2*w2 + yy2*w1 - 2.*xx*yy*w12
+              expon= xx*w2 + yy*w1 - 2.*x*y*w12
+              weight=exp(-0.5*expon)
 
-                  weight=exp(-0.5*expon)
-                  weight2 = weight*weight
+              wdata=weight*ymod
 
-                  wsum = wsum+weight
-                  w2sum = w2sum+weight2
-                  wwsumxx = wwsumxx + weight2*xx2
-                  wwsumxy = wwsumxy + weight2*xx*yy
-                  wwsumyy = wwsumyy + weight2*yy2
-                  wwexpon2sum = wwexpon2sum + weight2*expon*expon
+              sum   = sum   + wdata
+              sumxx = sumxx + wdata*xx
+              sumyy = sumyy + wdata*yy
+              sumxy = sumxy + wdata*x*y
+              sums4 = sums4 + wdata*expon*expon
 
-                  yy = yy + stepsize
-                enddo ! loop y sub pixels
-                xx = xx + stepsize
-              enddo ! loop x sub pixels
-
-              if (wsum .gt. 0) then
-                ymod = image(i,j)-sky(kk)
-                sumxx = sumxx + ymod*wwsumxx/wsum
-                sumxy = sumxy + ymod*wwsumxy/wsum
-                sumyy = sumyy + ymod*wwsumyy/wsum
-                sums4 = sums4 + ymod*wwexpon2sum/wsum
-                sum = sum + ymod*w2sum/wsum
-                wsumtot = wsumtot + w2sum/wsum
-              endif
+              wsum2tot = wsum2tot + weight*weight
 
             enddo
           enddo
@@ -658,6 +585,7 @@ c         4-sigma region around object, but within image
      &    abs(m(1,1)/m11old-1.).le.tol2)then
 
             ! convergence criteria met
+            isum(kk)=sum
             ixx(kk)=w(1,1)-ixx_psf1(kk)
             iyy(kk)=w(2,2)-iyy_psf1(kk)
             ixy(kk)=w(1,2)-ixy_psf1(kk)
@@ -669,8 +597,8 @@ c         4-sigma region around object, but within image
             else
               uncer(kk)=9999.
             endif
-            if (wsumtot .gt. 0.) then
-              s2n(kk)=sum/sqrt(wsumtot)/sigsky(kk)
+            if (wsum2tot .gt. 0.) then
+              s2n(kk)=sum/sqrt(wsum2tot)/sigsky(kk)
             else
               s2n(kk)=-9999.
             endif

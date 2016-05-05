@@ -1,10 +1,6 @@
-try:
-    import fimage
-except:
-    print("Could not import fimage")
-
 from numpy import sqrt
 def correct(image, psf):
+    import fimage
     mom_image = fimage.statistics.fmom(image)
     mom_psf = fimage.statistics.fmom(psf)
 

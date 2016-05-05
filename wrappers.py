@@ -19,11 +19,13 @@ flagmap={0:'ok',
          2**9: 'badnsub'}
 
 
-def admom(image, row, col, 
-          sky=0.0, sigsky=1.0, 
-          guess=None,
+def admom(image, row, col,
+          sky=0.0, sigsky=1.0,
+          guess=4.0,
+          maxit=100,
           shiftmax=5.0,
-          nsub=1):
+          nsub=1,
+          **kw):
     """
     Name:
         admom
@@ -34,25 +36,26 @@ def admom(image, row, col,
                     shiftmax=5.0)
 
     Inputs:
-        image: 
+        image:
             A two-dimensional image.  It will be converted if it is not 8-byte
             float or fortran order.
-        row, col: 
+        row, col:
             The center or centers for which moments are to be measured.
     Keywords:
-        sky: 
+        sky:
             The sky value in the image.  Can be a scalar or array of the same
             length as the row,col centers. Default is 0.0
-        sigsky: 
+        sigsky:
             The sigma of the sky in the image.  Can be a scalar or array of the
             same length as the row,col centers.  This is only used for error
             calculations.  Default is 1.0
 
-        guess: 
+        guess:
             A guess for the second order moments, Ixx or Iyy.  The same
             value is used as a guess for both.  This would be ~sigma**2
+            Default 4.0
 
-        shiftmax: 
+        shiftmax:
             Maximum allowed shift of the centroid in pixels.
         nsub:
 
@@ -81,13 +84,14 @@ def admom(image, row, col,
     # add 1 for fortran index
     row += 1
     col += 1
-    
+
     if col.size != row.size:
         raise ValueError("row and col must be same size")
 
     sky,sigsky = get_sky_sigsky(row.size, sky, sigsky)
 
 
+    Isum = numpy.zeros(row.size, dtype=dt) -9999
     Irr = numpy.zeros(row.size, dtype=dt)
     Irc = numpy.zeros(row.size, dtype=dt)
     Icc = numpy.zeros(row.size, dtype=dt)
@@ -105,15 +109,15 @@ def admom(image, row, col,
     whyflag = numpy.zeros(row.size, dtype='i4')
     whystr = numpy.zeros(row.size, dtype='S10')
 
-    if guess is not None:
-        Irr[:] = guess
-        Icc[:] = guess
-            
-    nsub=int(nsub)
-    _admomf.ad_mom(image,sky,sigsky,row,col,shiftmax,nsub,
-                   Irr,Irc,Icc,rho4,wrow,wcol,uncer,s2n,numiter,whyflag)
+    Irr[:] = guess
+    Icc[:] = guess
 
-                     
+    nsub=int(nsub)
+    maxit=int(maxit)
+    _admomf.ad_mom(image,sky,sigsky,row,col,shiftmax,nsub,maxit,
+                   Isum,Irr,Irc,Icc,rho4,wrow,wcol,uncer,s2n,numiter,whyflag)
+
+
     row -= 1
     col -= 1
     w,=numpy.where((wrow >= 1) & (wcol >= 1))
@@ -143,6 +147,7 @@ def admom(image, row, col,
 
     out={'row':row,
          'col':col,
+         'Isum':Isum,
          'Irr':Irr,
          'Irc':Irc,
          'Icc':Icc,
@@ -172,11 +177,13 @@ def admom(image, row, col,
     return out
 
 
-def admom_1psf(image, row, col, Irr_psf, Irc_psf, Icc_psf,
+def admom_1psf(image, row, col,
+               Irr_psf, Irc_psf, Icc_psf,
                sky=0.0, sigsky=1.0, 
                guess=None,
+               maxit=100,
                shiftmax=5.0,
-               nsub=4):
+               **kw):
     """
     Name:
         admom
@@ -207,13 +214,6 @@ def admom_1psf(image, row, col, Irr_psf, Irc_psf, Icc_psf,
 
         shiftmax: 
             Maximum allowed shift of the centroid in pixels.
-        nsub:
-
-            Corrections for sub-pixel effects will be calculated on a nsubXnsub
-            grid on each pixel.  Default is 4x4.  The error for small objects
-            can especially be problematic for nsub < 4. nsub=4 will acheive
-            0.5% accuracy even for sigma=1 pixel objects.  For very large
-            objects you can get way with no corrections at all (nsub=1)
 
     Outputs:
         A dictionary containing
@@ -250,6 +250,7 @@ def admom_1psf(image, row, col, Irr_psf, Irc_psf, Icc_psf,
     sky,sigsky = get_sky_sigsky(row.size, sky, sigsky)
 
 
+    Isum = numpy.zeros(row.size, dtype=dt) -9999
     Irr = numpy.zeros(row.size, dtype=dt)
     Irc = numpy.zeros(row.size, dtype=dt)
     Icc = numpy.zeros(row.size, dtype=dt)
@@ -271,11 +272,11 @@ def admom_1psf(image, row, col, Irr_psf, Irc_psf, Icc_psf,
         Irr[:] = guess
         Icc[:] = guess
             
-    nsub=int(nsub)
+    maxit=int(maxit)
     _admomf.ad_mom_1psf(image,sky,sigsky,row,col,shiftmax,
                         Irr_psf, Irc_psf, Icc_psf,
-                        nsub,
-                        Irr,Irc,Icc,rho4,wrow,wcol,uncer,s2n,numiter,whyflag)
+                        maxit,
+                        Isum,Irr,Irc,Icc,rho4,wrow,wcol,uncer,s2n,numiter,whyflag)
 
                      
     row -= 1
@@ -307,6 +308,8 @@ def admom_1psf(image, row, col, Irr_psf, Irc_psf, Icc_psf,
 
     out={'row':row,
          'col':col,
+         'Isum':Isum,
+         'Irr':Irr,
          'Irr':Irr,
          'Irc':Irc,
          'Icc':Icc,
@@ -323,7 +326,6 @@ def admom_1psf(image, row, col, Irr_psf, Irc_psf, Icc_psf,
          'numiter':numiter,
          'wrow':wrow,
          'wcol':wcol,
-         'nsub':nsub,
          'whyflag':whyflag,
          'whystr':whystr,
          'shiftmax':shiftmax,

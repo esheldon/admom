@@ -5,18 +5,6 @@ from numpy import cos, sin, pi as PI
 
 import admom
 
-try:
-    import fimage
-except:
-    print("Could not import fimage")
-try:
-    import images
-except:
-    print("Could not import images module")
-try:
-    import scipy.signal
-except:
-    print("Could not import scipy.signal")
 
 from . import unweighted
 from pprint import pprint
@@ -167,6 +155,7 @@ class ReGauss(dict):
         self.iprime = self.image - self.f0conv
 
         if self.debug:
+            import images
             images.compare_images(self.image,
                                   self.iprime,
                                   label1='original',
@@ -193,6 +182,7 @@ class ReGauss(dict):
             pprint(self['rgstats'])
    
     def make_f0(self):
+        import fimage
         if 'imstats' not in self or 'psfstats' not in self:
             raise ValueError("run admom on image and psf first")
 
@@ -236,7 +226,7 @@ class ReGauss(dict):
         Note psf and the subtracted gaussian are both normalized to 1, and
         epsilon thus integrates to zero
         """
-
+        import fimage
 
         if 'psfstats' not in self:
             raise ValueError("run admom on psf first")
@@ -265,6 +255,7 @@ class ReGauss(dict):
         tpsf = self.psf/self.psf.sum()
 
         if self.debug:
+            import images
             images.compare_images(tpsf, gauss, label1='psf',label2='gauss')
 
         epsilon = tpsf - gauss
@@ -281,6 +272,8 @@ class ReGauss(dict):
         the same in that expansion
 
         """
+        import scipy.signal
+        import images
         if self.f0 is None or self.epsilon is None:
             raise ValueError("Create both f0 and epsilon first")
         if self.f0 is None:
@@ -367,6 +360,7 @@ def test_regauss(gal_model='gauss',
 
     from pprint import pprint
     import fimage
+    import scipy.signal
 
     nsigma=5
 
@@ -409,6 +403,7 @@ def test_regauss(gal_model='gauss',
     imconv = scipy.signal.fftconvolve(gal, psf, mode='same')
 
     if show:
+        import images
         images.multiview(psf, levels=levels)
         images.multiview(gal, levels=levels)
         images.multiview(imconv, levels=levels)
