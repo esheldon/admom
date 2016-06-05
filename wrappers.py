@@ -114,8 +114,35 @@ def admom(image, row, col,
 
     nsub=int(nsub)
     maxit=int(maxit)
-    _admomf.ad_mom(image,sky,sigsky,row,col,shiftmax,nsub,maxit,
-                   Isum,Irr,Irc,Icc,rho4,wrow,wcol,uncer,s2n,numiter,whyflag)
+
+    if nsub > 1:
+        _admomf.ad_mom_sub(
+            image,
+            sky,sigsky,
+            row,col,
+            shiftmax,
+            nsub,maxit,
+            Isum,Irr,Irc,Icc,
+            rho4,
+            wrow,wcol,
+            uncer,
+            s2n,
+            numiter,
+            whyflag)
+    else:
+        _admomf.ad_mom(
+            image,
+            sky,sigsky,
+            row,col,
+            shiftmax,
+            maxit,
+            Isum,Irr,Irc,Icc,
+            rho4,
+            wrow,wcol,
+            uncer,
+            s2n,
+            numiter,
+            whyflag)
 
 
     row -= 1
